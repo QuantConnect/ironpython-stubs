@@ -476,6 +476,7 @@ def out_doc_attr(out_func, p_object, indent, p_class=None):
             the_doc = str(p_class.__doc__) # replace stock init's doc with class's; make it a certain string.
             the_doc += "\n# (copied from class doc)"
         out_docstring(out_func, the_doc, indent)
+        #print(the_doc)
     else:
         out_func(indent, "# no doc")
 
@@ -519,36 +520,56 @@ def restore_by_inspect(p_func):
         spec.append("**" + kwarg)
     return flatten(spec)
 
-def restore_parameters_for_overloads(parameter_lists):
-    param_index = 0
-    star_args = False
-    optional = False
-    params = []
-    while True:
-        parameter_lists_copy = [pl for pl in parameter_lists]
-        for pl in parameter_lists_copy:
-            if param_index >= len(pl):
-                parameter_lists.remove(pl)
-                optional = True
-        if not parameter_lists:
-            break
-        name = parameter_lists[0][param_index]
-        for pl in parameter_lists[1:]:
-            if pl[param_index] != name:
-                star_args = True
-                break
-        if star_args: break
-        if optional and not '=' in name:
-            params.append(name + '=None')
-        else:
-            params.append(name)
-        param_index += 1
-    if star_args:
-        params.append("*__args")
-    return params
+def restore_parameters_for_overloads(parameter_lists, parameter_types=None, method_returns=None):
+    if parameter_types is None or method_returns is None:
+        params = []
+        for param in parameter_lists:
+            if '=' in param:
+                params.append(param + '=None')
+            else:
+                params.append(param)
 
-def build_signature(p_name, params):
-    return p_name + '(' + ', '.join(params) + ')'
+        yield params, None
+        return
+
+    #while True:
+        #parameter_lists_copy = [pl for pl in parameter_lists]
+        #parameter_types_copy = [pt for pt in parameter_types]
+
+        #for (pl, pt) in zip(parameter_lists_copy, parameter_types_copy):
+        ##for pl in parameter_lists_copy:
+        #    #print(pl)
+        #    if param_index >= len(pl):
+        #        parameter_lists.remove(pl)
+        #        parameter_types.remove(pt)
+        #        optional = True
+
+        #if not parameter_lists:
+        #    break
+
+    for ((parameters, param_types), method) in zip(zip(parameter_lists, parameter_types), method_returns):
+        params = []
+
+        for (param, param_type) in zip(parameters, param_types):
+            #for (pl, pt) in zip(parameter_lists[1:], parameter_types[1:]):
+            ##for pl in parameter_lists[1:]:
+            #    if pl[param_index] != name:
+            #        star_args = True
+            #        break
+            #if star_args: break
+
+            if '=' in param:
+                params.append(param + ": " + "Optional[" + param_type + "]" + '=None')
+            else:
+                params.append(param + ": " + param_type)
+    #if star_args:
+    #    params.append("*__args")
+        yield params, method
+
+def build_signature(p_name, params, method_return=None):
+    if method_return is None:
+        return p_name + '(' + ', '.join(params) + ')'
+    return p_name + '(' + ', '.join(params) + ') -> ' + method_return
 
 
 def propose_first_param(deco):
@@ -646,7 +667,7 @@ def is_clr_type(clr_type):
     except TypeError:
         return False
 
-def restore_clr(p_name, p_class):
+def restore_clr(p_name, p_class, update_imports_for=None):
     """
     Restore the function signature by the CLR type signature
     :return (is_static, spec, sig_note)
@@ -655,27 +676,37 @@ def restore_clr(p_name, p_class):
     if p_name == '__new__':
         methods = [c for c in clr_type.GetConstructors()]
         if not methods:
-            return False, p_name + '(self, *args)', 'cannot find CLR constructor' # "self" is always first argument of any non-static method
+            yield False, p_name + '(self, *args)', 'cannot find CLR constructor', False# "self" is always first argument of any non-static method
+            return
     else:
         methods = [m for m in clr_type.GetMethods() if m.Name == p_name]
         if not methods:
             bases = p_class.__bases__
             if len(bases) == 1 and p_name in dir(bases[0]):
                 # skip inherited methods
-                return False, None, None
-            return False, p_name + '(self, *args)', 'cannot find CLR method'
+                yield False, None, None, False
+                return
+
+            yield False, p_name + '(self, *args)', 'cannot find CLR method', False
+            return
             # "self" is always first argument of any non-static method
 
     parameter_lists = []
+    parameter_types = []
+    method_returns = []
     for m in methods:
         parameter_lists.append([p.Name for p in m.GetParameters()])
-    params = restore_parameters_for_overloads(parameter_lists)
-    is_static = False
-    if not methods[0].IsStatic:
-        params = ['self'] + params
-    else:
-        is_static = True
-    return is_static, build_signature(p_name, params), None
+        parameter_types.append([resolve_generic_type_params(t.ParameterType, update_imports_for=update_imports_for) for t in m.GetParameters()])
+        return_type = m.ReturnType if m.Name == 'MethodInfo' else None
+        method_returns.append([resolve_generic_type_params(return_type, update_imports_for=update_imports_for)])
+
+    for (params, method_return) in restore_parameters_for_overloads(parameter_lists, parameter_types, method_returns):
+        is_static = False
+        if not methods[0].IsStatic:
+            params = ['self'] + params
+        else:
+            is_static = True
+        yield is_static, build_signature(p_name, params, method_return=method_return[0]), None, True
 
 def build_output_name(dirname, qualified_name):
     qualifiers = qualified_name.split(".")
@@ -704,3 +735,36 @@ def build_output_name(dirname, qualified_name):
         os.makedirs(dirname)
 
     return fname
+
+def resolve_generic_type_params(clr_type, update_imports_for=None):
+    if clr_type is None:
+        return 'None'
+    
+    generic_args = clr_type.GenericTypeArguments
+    type_arg_count = len(generic_args)
+
+    if clr_type.IsGenericType and type_arg_count == 0:
+        clr_type = clr_type.GetGenericTypeDefinition()
+        generic_args = clr_type.GetGenericTypeArguments()
+
+    if update_imports_for is not None:
+        # Update imports, including for all generic type params
+        update_imports_for.used_imports[clr_type.Namespace if clr_type.Namespace != '' else '.'] = '*'
+
+    clr.AddReference("System")
+    clr.AddReference("System.Collections")
+    from System import Array
+    from System.Collections import IEnumerable
+
+    generic_types = ''
+
+    if len(generic_args) != 0:
+        generic_types = '[' + ', '.join([resolve_generic_type_params(t) for t in generic_args]) + ']'
+
+    if IEnumerable.GetType().IsAssignableFrom(clr_type) or clr.GetClrType(Array).IsAssignableFrom(clr_type):
+        final_value = 'List[{}]'.format(clr_type.Name.split('`')[0] + generic_types)
+    else:
+        final_value = clr_type.Name.split('`')[0] + generic_types
+
+    return final_value.replace('[]', '')
+

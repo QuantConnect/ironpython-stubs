@@ -450,8 +450,9 @@ class ModuleRedeclarator(object):
                 else:
                     ret_literal = None
                 param_lists = [result[0] for result in docstring_results]
-                spec = build_signature(func_name, restore_parameters_for_overloads(param_lists))
-                return (spec, ret_literal, "restored from __doc__ with multiple overloads")
+                for parameters, _ in param_lists:
+                    spec = build_signature(func_name, restore_parameters_for_overloads(parameters))
+                    return (spec, ret_literal, "restored from __doc__ with multiple overloads")
 
         # find the first thing to look like a definition
         prefix_re = re.compile("\s*(?:(\w+)[ \\t]+)?" + func_id + "\s*\(") # "foo(..." or "int foo(..."
@@ -534,16 +535,19 @@ class ModuleRedeclarator(object):
             out(indent, "def ", spec, ": # ", sig_note)
             out_doc_attr(out, p_func, indent + 1, p_class)
         elif sys.platform == 'cli' and is_clr_type(p_class):
-            is_static, spec, sig_note = restore_clr(p_name, p_class)
-            if is_static:
-                out(indent, "@staticmethod")
-            if not spec: return
-            if sig_note:
-                out(indent, "def ", spec, ": #", sig_note)
-            else:
-                out(indent, "def ", spec, ":")
-            if not p_name in ['__gt__', '__ge__', '__lt__', '__le__', '__ne__', '__reduce_ex__', '__str__']:
-                out_doc_attr(out, p_func, indent + 1, p_class)
+            type_clr = clr.GetClrType(p_class)
+            for is_static, spec, sig_note, overloaded in restore_clr(p_name, p_class, update_imports_for=self):
+                if is_static:
+                    out(indent, "@staticmethod")
+                if not spec: return
+                if overloaded:
+                    out(indent, "@overload")
+                if sig_note:
+                    out(indent, "def ", spec, ": #", sig_note)
+                else:
+                    out(indent, "def ", spec, ":")
+                if not p_name in ['__gt__', '__ge__', '__lt__', '__le__', '__ne__', '__reduce_ex__', '__str__']:
+                    out_doc_attr(out, p_func, indent + 1, p_class)
         elif mod_class_method_tuple in PREDEFINED_MOD_CLASS_SIGS:
             sig, ret_literal = PREDEFINED_MOD_CLASS_SIGS[mod_class_method_tuple]
             if classname:
@@ -732,17 +736,22 @@ class ModuleRedeclarator(object):
                     getter, prop_type = getter_and_type
                 else:
                     getter, prop_type = None, None
-                out(indent + 1, item_name,
-                    " = property(", format_accessors(acc_line, getter, a_setter, a_deleter), ")"
-                )
+                #out(indent + 1, item_name,
+                #    " = property(", format_accessors(acc_line, getter, a_setter, a_deleter), ")"
+                #)
                 if prop_type:
+                    getter = '""":type"""' == "Get"
+
+                        #out(0, "")
+                    #else:
+                    #    out(indent + 1, '""":type: ', prop_type, '"""')
+
+                    out(indent + 1, "@property" if getter else ("@" + prop_type.split("(")[0] + ".setter"))
+                    out(indent + 1, "definately ", prop_type, ':')
                     if prop_docstring:
-                        out(indent + 1, '"""', prop_docstring)
-                        out(0, "")
-                        out(indent + 1, ':type: ', prop_type)
-                        out(indent + 1, '"""')
-                    else:
-                        out(indent + 1, '""":type: ', prop_type, '"""')
+                        out(indent + 1, '"""', prop_docstring, '"""')
+                    out(indent + 1, "pass")
+
                     out(0, "")
             else:
                 out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")

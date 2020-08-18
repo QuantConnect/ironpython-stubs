@@ -1,5 +1,7 @@
 import keyword
 
+import clr
+from System.Reflection import BindingFlags
 from util_methods import *
 from constants import *
 
@@ -541,7 +543,6 @@ class ModuleRedeclarator(object):
             out(indent, "def ", spec, ": # ", sig_note)
             out_doc_attr(out, p_func, indent + 1, p_class)
         elif sys.platform == 'cli' and is_clr_type(p_class):
-            type_clr = clr.GetClrType(p_class)
             for is_static, spec, sig_note, overloaded in restore_clr(p_name, p_class, update_imports_for=self):
                 if is_static:
                     out(indent, "@staticmethod")
@@ -647,7 +648,14 @@ class ModuleRedeclarator(object):
                     skipped_bases.append(str(base))
                     continue
                     # somehow import every base class
-                base_name = base.__name__
+
+                clr_type = clr.GetClrType(base)
+                if clr_type is not None:
+                    namespace = '' if clr_type.Namespace == '' else clr_type.Namespace + '.'
+                    base_name = namespace + base.__name__
+                else:
+                    base_name = base.__name__
+
                 qual_module_name = qualifier_of(base, skip_qualifiers)
                 got_existing_import = False
                 if qual_module_name:
@@ -764,9 +772,24 @@ class ModuleRedeclarator(object):
 
                     out(0, "")
             else:
-                out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
+                # DEBUG: thing is the type here, if we have it :thinking:
+                try:
+                    property_class = clr.GetClrType(item.__objclass__)
+                    return_type = property_class.GetProperty(item.__name__, BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                        
+                    if return_type is None:
+                        continue
+
+                    return_type = resolve_generic_type_params(return_type.PropertyType, update_imports_for=self)
+                    out(indent + 1, item.__name__ + ": " + return_type)
+
+                except Exception as e:
+                    print('Falling back to no PropertyType declaration for {}'.format(item.__name__))
+                    print(str(e))
+                    out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
                 if prop_docstring:
-                    out(indent + 1, '"""', prop_docstring, '"""')
+                    pass
+                    #out(indent + 1, '"""', prop_docstring, '"""')
                 out(0, "")
         if properties:
             out(0, "") # empty line after the block
@@ -1093,35 +1116,36 @@ class ModuleRedeclarator(object):
                 import_names = self.used_imports[mod_name]
                 if import_names:
                     self._defined[mod_name] = True
-                    right_pos = 0 # tracks width of list to fold it at right margin
-                    import_heading = "from % s import (" % mod_name
-                    right_pos += len(import_heading)
-                    names_pack = [import_heading]
-                    indent_level = 0
-                    import_names = list(import_names)
-                    import_names.sort()
-                    for n in import_names:
-                        self._defined[n] = True
-                        len_n = len(n)
-                        if right_pos + len_n >= 78:
-                            out(indent_level, *names_pack)
-                            names_pack = [n, ", "]
-                            if indent_level == 0:
-                                indent_level = 1 # all but first line is indented
-                            right_pos = self.indent_size + len_n + 2
-                        else:
-                            names_pack.append(n)
-                            names_pack.append(", ")
-                            right_pos += (len_n + 2)
-                            # last line is...
-                    if indent_level == 0: # one line
-                        names_pack[0] = names_pack[0][:-1] # cut off lpar
-                        names_pack[-1] = "" # cut last comma
-                    else: # last line of multiline
-                        names_pack[-1] = ")" # last comma -> rpar
-                    out(indent_level, *names_pack)
+                    #right_pos = 0 # tracks width of list to fold it at right margin
+                    #import_heading = "import % s (" % mod_name
+                    out(0, "import {}".format(mod_name))
+                    #right_pos += len(import_heading)
+                    #names_pack = [import_heading]
+                    #indent_level = 0
+                    #import_names = list(import_names)
+                    #import_names.sort()
+                    #for n in import_names:
+                    #    self._defined[n] = True
+                    #    len_n = len(n)
+                    #    if right_pos + len_n >= 78:
+                    #        out(indent_level, *names_pack)
+                    #        names_pack = [n, ", "]
+                    #        if indent_level == 0:
+                    #            indent_level = 1 # all but first line is indented
+                    #        right_pos = self.indent_size + len_n + 2
+                    #    else:
+                    #        names_pack.append(n)
+                    #        names_pack.append(", ")
+                    #        right_pos += (len_n + 2)
+                    #        # last line is...
+                    #if indent_level == 0: # one line
+                    #    names_pack[0] = names_pack[0][:-1] # cut off lpar
+                    #    names_pack[-1] = "" # cut last comma
+                    #else: # last line of multiline
+                    #    names_pack[-1] = ")" # last comma -> rpar
+                    #out(indent_level, *names_pack)
 
-                    out(0, "") # empty line after group
+                    #out(0, "") # empty line after group
 
         if self.hidden_imports:
             self.add_import_header_if_needed()

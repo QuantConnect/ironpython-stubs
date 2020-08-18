@@ -27,9 +27,9 @@ ASSEMBLIES = [
     #'PresentationFramework',
     #'WindowsBase',
     ## | System
-    'System',
-    'System.Drawing',
-    'System.Windows.Forms',
+    #'System',
+    #'System.Drawing',
+    #'System.Windows.Forms',
     'QuantConnect.Common',
     'QuantConnect.Algorithm'
     ## | Dynamo

@@ -476,7 +476,6 @@ def out_doc_attr(out_func, p_object, indent, p_class=None):
             the_doc = str(p_class.__doc__) # replace stock init's doc with class's; make it a certain string.
             the_doc += "\n# (copied from class doc)"
         out_docstring(out_func, the_doc, indent)
-        #print(the_doc)
     else:
         out_func(indent, "# no doc")
 
@@ -592,7 +591,8 @@ def handle_error_func(item_name, out):
     msg = "Error generating skeleton for function %s: %s"
     args = item_name, value
     report(msg, *args)
-    out(0, "# " + msg % args)
+    #out(2, "# " + msg % args)
+    out(2, "pass")
     out(0, "")
 
 def format_accessors(accessor_line, getter, setter, deleter):
@@ -670,7 +670,7 @@ def is_clr_type(clr_type):
 def restore_clr(p_name, p_class, update_imports_for=None):
     """
     Restore the function signature by the CLR type signature
-    :return (is_static, spec, sig_note)
+    :return (is_static, spec, sig_note, overloaded: bool)
     """
     clr_type = clr.GetClrType(p_class)
     if p_name == '__new__':
@@ -697,7 +697,7 @@ def restore_clr(p_name, p_class, update_imports_for=None):
     for m in methods:
         parameter_lists.append([p.Name for p in m.GetParameters()])
         parameter_types.append([resolve_generic_type_params(t.ParameterType, update_imports_for=update_imports_for) for t in m.GetParameters()])
-        return_type = m.ReturnType if m.Name == 'MethodInfo' else None
+        return_type = m.ReturnType if m.Name != '.ctor' else None
         method_returns.append([resolve_generic_type_params(return_type, update_imports_for=update_imports_for)])
 
     for (params, method_return) in restore_parameters_for_overloads(parameter_lists, parameter_types, method_returns):
@@ -706,6 +706,7 @@ def restore_clr(p_name, p_class, update_imports_for=None):
             params = ['self'] + params
         else:
             is_static = True
+
         yield is_static, build_signature(p_name, params, method_return=method_return[0]), None, True
 
 def build_output_name(dirname, qualified_name):
@@ -737,7 +738,7 @@ def build_output_name(dirname, qualified_name):
     return fname
 
 def resolve_generic_type_params(clr_type, update_imports_for=None):
-    if clr_type is None:
+    if clr_type is None or (clr_type.Name == 'Void' and clr_type.Namespace == 'System'):
         return 'None'
     
     generic_args = clr_type.GenericTypeArguments
@@ -766,5 +767,6 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
     else:
         final_value = clr_type.Name.split('`')[0] + generic_types
 
-    return final_value.replace('[]', '')
+    namespace = '' if clr_type.Namespace == '' else clr_type.Namespace + '.'
+    return namespace + final_value.replace('[]', '').replace('&', '')
 

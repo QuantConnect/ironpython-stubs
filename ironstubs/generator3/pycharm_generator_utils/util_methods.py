@@ -1,6 +1,7 @@
 from constants import *
 import keyword
 
+
 try:
     import inspect
 except ImportError:
@@ -649,6 +650,10 @@ import sys
 if sys.platform == 'cli':
     #noinspection PyUnresolvedReferences
     import clr
+    clr.AddReference("System")
+    clr.AddReference("System.Collections")
+    from System import Array
+    from System.Collections import IEnumerable
 
 # http://blogs.msdn.com/curth/archive/2009/03/29/an-ironpython-profiler.aspx
 def print_profile():
@@ -740,7 +745,7 @@ def build_output_name(dirname, qualified_name):
 def resolve_generic_type_params(clr_type, update_imports_for=None):
     if clr_type is None or (clr_type.Name == 'Void' and clr_type.Namespace == 'System'):
         return 'None'
-    
+
     generic_args = clr_type.GenericTypeArguments
     type_arg_count = len(generic_args)
 
@@ -748,25 +753,44 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
         clr_type = clr_type.GetGenericTypeDefinition()
         generic_args = clr_type.GetGenericTypeArguments()
 
-    if update_imports_for is not None:
-        # Update imports, including for all generic type params
-        update_imports_for.used_imports[clr_type.Namespace if clr_type.Namespace != '' else '.'] = '*'
-
-    clr.AddReference("System")
-    clr.AddReference("System.Collections")
-    from System import Array
-    from System.Collections import IEnumerable
-
     generic_types = ''
-
+    namespace = '' if clr_type.Namespace == '' else clr_type.Namespace + '.'
+    class_name = namespace + clr_type.Name.split('`')[0]
+    skip_import = False
+    # We don't want to replace the [] in the callable, so let's use a placeholder
+    # value instead to replace at the end to strip it out of the final spec
+    callable_replace = 'CALLABLE_REPLACE'
     if len(generic_args) != 0:
-        generic_types = '[' + ', '.join([resolve_generic_type_params(t) for t in generic_args]) + ']'
+        if class_name == 'System.Action':
+            resolved_generics = [resolve_generic_type_params(t) for t in generic_args]
+            if not any(resolved_generics):
+                resolved_generics = [callable_replace]
+
+            class_name = 'typing.Callable[[' + ', '.join(resolved_generics) + '], None]'
+            skip_import = True
+        elif class_name == 'System.Func':
+            last_resolved = resolve_generic_type_params(generic_args[-1])
+            resolved_generics = [resolve_generic_type_params(t) for t in generic_args[:-1]]
+            if not any(resolved_generics):
+                resolved_generics = [callable_replace]
+
+            class_name = 'typing.Callable[[' + ', '.join(resolved_generics) + '], ' + last_resolved + ']'
+            skip_import = True
+        else:
+            generic_types = '[' + ', '.join([resolve_generic_type_params(t) for t in generic_args]) + ']'
+
+    if class_name in PYTHONNET_CONVERSIONS:
+        class_name = PYTHONNET_CONVERSIONS[class_name]
+        skip_import = '.' not in class_name
+
+    if update_imports_for is not None and not skip_import:
+        # Update imports, including for all generic type params and the typing builtin
+        update_imports_for.used_imports['typing'] = '*'
+        update_imports_for.used_imports[(class_name if class_name != '' else '.').replace('[]', '').replace('&', '')] = '*'
+
+    class_name += generic_types
 
     if IEnumerable.GetType().IsAssignableFrom(clr_type) or clr.GetClrType(Array).IsAssignableFrom(clr_type):
-        final_value = 'List[{}]'.format(clr_type.Name.split('`')[0] + generic_types)
-    else:
-        final_value = clr_type.Name.split('`')[0] + generic_types
+        class_name = 'typing.List[{}]'.format(class_name)
 
-    namespace = '' if clr_type.Namespace == '' else clr_type.Namespace + '.'
-    return namespace + final_value.replace('[]', '').replace('&', '')
-
+    return class_name.replace('[]', '').replace('&', '').replace(callable_replace, '')

@@ -561,6 +561,7 @@ PYTHONNET_CONVERSIONS = {
     'System.Collections.Generic.IList': 'typing.List',
     'System.Collections.Generic.ICollection': 'typing.List',
     'System.Collections.Generic.IEnumerable': 'typing.List',
+    'System.Collections.Generic.IReadOnlyList': 'typing.List'
 }
 
 bin_collections_names = ['collections', '_collections']

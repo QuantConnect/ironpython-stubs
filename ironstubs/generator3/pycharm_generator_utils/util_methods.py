@@ -283,6 +283,8 @@ _prop_types = tuple(_prop_types)
 def is_property(x):
     return isinstance(x, _prop_types)
 
+def is_field(x):
+    return 'FieldType' in dir(x)
 
 def sanitize_ident(x, is_clr=False):
     """Takes an identifier and returns it sanitized"""
@@ -681,7 +683,7 @@ def restore_clr(p_name, p_class, update_imports_for=None):
     if p_name == '__new__':
         methods = [c for c in clr_type.GetConstructors()]
         if not methods:
-            yield False, p_name + '(self, *args)', 'cannot find CLR constructor', False# "self" is always first argument of any non-static method
+            yield False, p_name + '(self, *args)', 'cannot find CLR constructor', 'None'# "self" is always first argument of any non-static method
             return
     else:
         methods = [m for m in clr_type.GetMethods() if m.Name == p_name]
@@ -689,10 +691,10 @@ def restore_clr(p_name, p_class, update_imports_for=None):
             bases = p_class.__bases__
             if len(bases) == 1 and p_name in dir(bases[0]):
                 # skip inherited methods
-                yield False, None, None, False
+                yield False, None, None, 'None'
                 return
 
-            yield False, p_name + '(self, *args)', 'cannot find CLR method', False
+            yield False, None, None, 'None'#p_name + '(self, *args)', 'cannot find CLR method', 'None'
             return
             # "self" is always first argument of any non-static method
 
@@ -712,7 +714,7 @@ def restore_clr(p_name, p_class, update_imports_for=None):
         else:
             is_static = True
 
-        yield is_static, build_signature(p_name, params, method_return=method_return[0]), None, True
+        yield is_static, build_signature(p_name, params, method_return=method_return[0]), None, method_return[0]
 
 def build_output_name(dirname, qualified_name):
     qualifiers = qualified_name.split(".")
@@ -763,7 +765,7 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
     if len(generic_args) != 0:
         if class_name == 'System.Action':
             resolved_generics = [resolve_generic_type_params(t) for t in generic_args]
-            if not any(resolved_generics):
+            if not any(resolved_generics) or all([generic == '' for generic in resolved_generics]):
                 resolved_generics = [callable_replace]
 
             class_name = 'typing.Callable[[' + ', '.join(resolved_generics) + '], None]'
@@ -779,14 +781,25 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
         else:
             generic_types = '[' + ', '.join([resolve_generic_type_params(t) for t in generic_args]) + ']'
 
+    two_dim_array = False
+    if '[,]' in class_name:
+        class_name = class_name.replace('[,]', '')
+        two_dim_array = True
+
+    # Required in case of array
+    class_name = class_name.replace('[]', '')
+
     if class_name in PYTHONNET_CONVERSIONS:
         class_name = PYTHONNET_CONVERSIONS[class_name]
-        skip_import = '.' not in class_name
+        if two_dim_array:
+            class_name = 'typing.List[' + class_name + ']'
+
+        skip_import = '.' not in class_name or class_name.startswith('typing.')
 
     if update_imports_for is not None and not skip_import:
         # Update imports, including for all generic type params and the typing builtin
         update_imports_for.used_imports['typing'] = '*'
-        update_imports_for.used_imports[(class_name if class_name != '' else '.').replace('[]', '').replace('&', '')] = '*'
+        update_imports_for.used_imports['.' if clr_type.Namespace == '' else clr_type.Namespace] = '*'
 
     class_name += generic_types
 

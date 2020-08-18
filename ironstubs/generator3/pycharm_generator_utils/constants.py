@@ -532,6 +532,37 @@ PREDEFINED_MOD_CLASS_SIGS = {                                       #TODO: user-
     ("numpy.core.multiarray", "ndarray", "resize"): ("(self, *new_shape, refcheck=True)", None),
 }
 
+PYTHONNET_CONVERSIONS = {
+    'System.Boolean': 'bool',
+    'System.Byte': 'bytes',
+    'System.SByte': 'bytes',
+    'System.Char': 'str',
+    'System.Decimal': 'float',
+    'System.Double': 'float',
+    'System.Float': 'float',
+    'System.Single': 'float',
+    'System.Int32': 'int',
+    'System.UInt32': 'int',
+    'System.Int64': 'int',
+    'System.UInt64': 'int',
+    'System.Int16': 'int',
+    'System.UInt16': 'int',
+    
+    'System.Object': 'object',
+    'System.object': 'object',
+    'System.String': 'str',
+
+    'System.Type': 'type',
+    'System.DateTime': 'datetime.datetime',
+    'System.TimeSpan': 'datetime.timedelta',
+    'System.Nullable': 'typing.Optional',
+
+    'System.Collections.Generic.List': 'typing.List',
+    'System.Collections.Generic.IList': 'typing.List',
+    'System.Collections.Generic.ICollection': 'typing.List',
+    'System.Collections.Generic.IEnumerable': 'typing.List',
+}
+
 bin_collections_names = ['collections', '_collections']
 
 for name in bin_collections_names:

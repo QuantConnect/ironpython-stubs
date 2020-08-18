@@ -493,6 +493,9 @@ class ModuleRedeclarator(object):
                id() because *some* functions are unhashable (eg _elementtree.Comment in py2.7)
         """
         action("redoing func %r of class %r", p_name, p_class)
+        if p_name == 'AddAlpha':
+            print(p_name, p_func)
+
         if seen is not None:
             other_func = seen.get(id(p_func), None)
             if other_func and getattr(other_func, "__doc__", None) is getattr(p_func, "__doc__", None):
@@ -543,10 +546,20 @@ class ModuleRedeclarator(object):
             out(indent, "def ", spec, ": # ", sig_note)
             out_doc_attr(out, p_func, indent + 1, p_class)
         elif sys.platform == 'cli' and is_clr_type(p_class):
+            if p_name == 'AddAlpha':
+                print('Made it to clr add')
+
             for is_static, spec, sig_note, overloaded in restore_clr(p_name, p_class, update_imports_for=self):
+                # Replaces invalid type parameters
+
                 if is_static:
                     out(indent, "@staticmethod")
-                if not spec: return
+                if not spec:
+                    return
+                
+                # Replace any parameter that uses a disallowed keyword
+                spec = spec.replace('from:', 'from_:').replace('lambda:', 'lambda_:')
+
                 if overloaded:
                     out(indent, "@overload")
                 if sig_note:
@@ -554,7 +567,14 @@ class ModuleRedeclarator(object):
                 else:
                     out(indent, "def ", spec, ":")
                 if not p_name in ['__gt__', '__ge__', '__lt__', '__le__', '__ne__', '__reduce_ex__', '__str__']:
-                    out_doc_attr(out, p_func, indent + 1, p_class)
+                    pass
+                    # TODO: No docs for now, since they're very noisy
+                    #out_doc_attr(out, p_func, indent + 1, p_class)
+                
+                out(indent + 1, "pass")
+                out(0, "")
+            return
+
         elif mod_class_method_tuple in PREDEFINED_MOD_CLASS_SIGS:
             sig, ret_literal = PREDEFINED_MOD_CLASS_SIGS[mod_class_method_tuple]
             if classname:
@@ -772,7 +792,6 @@ class ModuleRedeclarator(object):
 
                     out(0, "")
             else:
-                # DEBUG: thing is the type here, if we have it :thinking:
                 try:
                     property_class = clr.GetClrType(item.__objclass__)
                     return_type = property_class.GetProperty(item.__name__, BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)

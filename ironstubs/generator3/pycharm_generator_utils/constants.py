@@ -167,13 +167,10 @@ else:
             return data.decode(OUT_ENCODING, 'replace')
         return str(data)
 
-if version[0] > 2:
-    import io  # in 3.0
+import io  # in 3.0
 
-    #noinspection PyArgumentList
-    fopen = lambda name, mode: io.open(name, mode, encoding=OUT_ENCODING)
-else:
-    fopen = open
+#noinspection PyArgumentList
+fopen = lambda name, mode: io.open(name, mode, encoding=OUT_ENCODING)
 
 if sys.platform == 'cli':
     #noinspection PyUnresolvedReferences

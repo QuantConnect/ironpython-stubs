@@ -493,8 +493,6 @@ class ModuleRedeclarator(object):
                id() because *some* functions are unhashable (eg _elementtree.Comment in py2.7)
         """
         action("redoing func %r of class %r", p_name, p_class)
-        if p_name == 'AddAlpha':
-            print(p_name, p_func)
 
         if seen is not None:
             other_func = seen.get(id(p_func), None)
@@ -546,22 +544,20 @@ class ModuleRedeclarator(object):
             out(indent, "def ", spec, ": # ", sig_note)
             out_doc_attr(out, p_func, indent + 1, p_class)
         elif sys.platform == 'cli' and is_clr_type(p_class):
-            if p_name == 'AddAlpha':
-                print('Made it to clr add')
+            restored_clr_methods = list(restore_clr(p_name, p_class, update_imports_for=self))
+            overloaded = len(restored_clr_methods) > 1
 
-            for is_static, spec, sig_note, overloaded in restore_clr(p_name, p_class, update_imports_for=self):
-                # Replaces invalid type parameters
-
+            for is_static, spec, sig_note, method_return in restored_clr_methods:
                 if is_static:
                     out(indent, "@staticmethod")
                 if not spec:
                     return
                 
-                # Replace any parameter that uses a disallowed keyword
+                # Replace any parameter that uses a prohibited keyword
                 spec = spec.replace('from:', 'from_:').replace('lambda:', 'lambda_:')
 
                 if overloaded:
-                    out(indent, "@overload")
+                    out(indent, "@typing.overload")
                 if sig_note:
                     out(indent, "def ", spec, ": #", sig_note)
                 else:
@@ -573,6 +569,13 @@ class ModuleRedeclarator(object):
                 
                 out(indent + 1, "pass")
                 out(0, "")
+
+            if overloaded:
+                # Use the last method return to set the overloaded method
+                out(indent, "def " + p_name + "(self, *args) -> " + method_return + ":")
+                out(indent + 1, "pass")
+                out(0, "")
+
             return
 
         elif mod_class_method_tuple in PREDEFINED_MOD_CLASS_SIGS:
@@ -703,6 +706,7 @@ class ModuleRedeclarator(object):
         # inner parts
         methods = {}
         properties = {}
+        class_fields = {}
         others = {}
         we_are_the_base_class = p_modname == BUILTIN_MOD_NAME and p_name == "object"
         field_source = {}
@@ -735,6 +739,8 @@ class ModuleRedeclarator(object):
                 methods[item_name] = item
             elif is_property(item):
                 properties[item_name] = item
+            elif is_field(item):
+                class_fields[item_name] = item
             else:
                 others[item_name] = item
                 #
@@ -761,6 +767,10 @@ class ModuleRedeclarator(object):
         known_props = KNOWN_PROPS.get(p_modname, {})
         a_setter = "lambda self, v: None"
         a_deleter = "lambda self: None"
+
+        has_members = False
+        out(indent + 1, "def __init__(self, *args):")
+
         for item_name in sorted_no_case(properties.keys()):
             item = properties[item_name]
             prop_docstring = getattr(item, '__doc__', None)
@@ -792,6 +802,7 @@ class ModuleRedeclarator(object):
 
                     out(0, "")
             else:
+
                 try:
                     property_class = clr.GetClrType(item.__objclass__)
                     return_type = property_class.GetProperty(item.__name__, BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
@@ -799,23 +810,40 @@ class ModuleRedeclarator(object):
                     if return_type is None:
                         continue
 
+                    has_members = True
                     return_type = resolve_generic_type_params(return_type.PropertyType, update_imports_for=self)
-                    out(indent + 1, item.__name__ + ": " + return_type)
-
+                    out(indent + 2, "self." + item.__name__ + ": " + return_type)
                 except Exception as e:
+                    # Shouldn't ever happen, but let's cover ourselves if it does
                     print('Falling back to no PropertyType declaration for {}'.format(item.__name__))
                     print(str(e))
-                    out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
+
+                    has_members = True
+                    out(indent + 2, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
                 if prop_docstring:
                     pass
                     #out(indent + 1, '"""', prop_docstring, '"""')
                 out(0, "")
+
+        for item_name in sorted_no_case(class_fields.keys()):
+            item = class_fields[item_name]
+            has_members = True
+            return_type = resolve_generic_type_params(clr.GetClrType(item.FieldType), update_imports_for=self)
+            out(indent + 2, "self." + item_name + ": " + return_type)
+
         if properties:
             out(0, "") # empty line after the block
-            #
+
+        # These are class fields, we should treat them no differently from properties
         for item_name in sorted_no_case(others.keys()):
+            has_members = True
             item = others[item_name]
-            self.fmt_value(out, item, indent + 1, prefix=item_name + " = ")
+            out(indent + 2, "self." + item_name + ": " + type(item).__name__)
+
+        if not has_members:
+            out(indent + 2, "pass")
+
+            #self.fmt_value(out, item, indent + 1, prefix=item_name + " = ")
         if p_name == "object":
             out(indent + 1, "__module__ = ''")
         if others:

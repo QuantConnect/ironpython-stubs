@@ -759,7 +759,6 @@ class ModuleRedeclarator(object):
         a_deleter = "lambda self: None"
 
         has_members = False
-        out(indent + 1, "def __init__(self, *args):")
 
         for item_name in sorted_no_case(properties.keys()):
             item = properties[item_name]
@@ -802,14 +801,14 @@ class ModuleRedeclarator(object):
 
                     has_members = True
                     return_type = resolve_generic_type_params(return_type.PropertyType, update_imports_for=self)
-                    out(indent + 2, "self." + item.__name__ + ": " + return_type)
+                    out(indent + 1, item.__name__ + ": " + return_type)
                 except Exception as e:
                     # Shouldn't ever happen, but let's cover ourselves if it does
                     print('Falling back to no PropertyType declaration for {}'.format(item.__name__))
                     print(str(e))
 
                     has_members = True
-                    out(indent + 2, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
+                    out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
                 if prop_docstring:
                     pass
                     #out(indent + 1, '"""', prop_docstring, '"""')
@@ -819,7 +818,7 @@ class ModuleRedeclarator(object):
             item = class_fields[item_name]
             has_members = True
             return_type = resolve_generic_type_params(clr.GetClrType(item.FieldType), update_imports_for=self)
-            out(indent + 2, "self." + item_name + ": " + return_type)
+            out(indent + 1, item_name + ": " + return_type)
 
         if properties:
             out(0, "") # empty line after the block
@@ -828,10 +827,7 @@ class ModuleRedeclarator(object):
         for item_name in sorted_no_case(others.keys()):
             has_members = True
             item = others[item_name]
-            out(indent + 2, "self." + item_name + ": " + type(item).__name__)
-
-        if not has_members:
-            out(indent + 2, "pass")
+            out(indent + 1, item_name + ": " + type(item).__name__)
 
             #self.fmt_value(out, item, indent + 1, prefix=item_name + " = ")
         if p_name == "object":

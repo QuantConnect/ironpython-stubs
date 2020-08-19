@@ -799,6 +799,7 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
     if update_imports_for is not None and not skip_import:
         # Update imports, including for all generic type params and the typing builtin
         update_imports_for.used_imports['typing'] = '*'
+        update_imports_for.used_imports['datetime'] = '*'
         update_imports_for.used_imports['.' if clr_type.Namespace == '' else clr_type.Namespace] = '*'
 
     class_name += generic_types

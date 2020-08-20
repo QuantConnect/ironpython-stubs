@@ -22,7 +22,7 @@ import re
 
 def custom_sanitizer(src):
     # comment out error skeleton
-    src = re.sub(r'(.+?[\r\n])(.*?def .+?[\r\n])(.*?# Error generating skeleton.*)', r'#\1#\2\3 removed', src, flags=re.M)
+    src = re.sub(r'(.*?[\r\n])(.*?def .+?[\r\n])(.*?# Error generating skeleton.*)', r'#\1#\2\3 removed', src, flags=re.M)
     # comment out None=None
     src = re.sub(r'(None = None)', r'#\1', src, flags=re.M)
     # rename "from" param
@@ -30,9 +30,9 @@ def custom_sanitizer(src):
     return src
 
 
-def parse(src):
+def parse(src, filename="<unknown>"):
     src = custom_sanitizer(src)
-    t = ast_utils.parse(src)
+    t = ast_utils.parse(src, filename)
     annotator = annotate.AstAnnotator(src)
     annotator.visit(t)
     return t

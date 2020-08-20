@@ -5,6 +5,8 @@ DEL /f /q /s *.* > NUL
 cd ..
 rmdir /q /s QuantConnect
 cd ..
+cd ..
 %ironpython_path%\ipy -X:FullFrames -m ironstubs make --all --keep-partial
-python -m stubsGenerator --path=%project_path%\\release\stubs\QuantConnect --partition --keep-partial
+python -m stubsGenerator --path=%project_path%\\release\stubs\QuantConnect --partition
+
 

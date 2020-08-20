@@ -12,21 +12,19 @@ def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
             filename, file_extension = os.path.splitext(file)
             if file_extension=='.py':
                 file_path = os.path.join(subdir, file)
-                tree_original = None
+                with open(file_path, "r") as f:
+                    file_content = f.read()
+                tree_original = pasta.parse(file_content, file_path)
+                lst_tree_original = [pasta.dump(f) for f in tree_original.body]
                 i = 0
                 partial_files = []
                 while (True):
                     dst = file_path + "_" + str(i)
                     if os.path.exists(dst):
                         partial_files.append(dst)
-                        if tree_original == None:
-                            with open(file_path, "r") as f:
-                                file_content = f.read()
-                            tree_original = pasta.parse(file_content)
-                            lst_tree_original = [pasta.dump(f) for f in tree_original.body]
                         i += 1
                         with open(dst, "r") as f:
-                            tree = pasta.parse(f.read())
+                            tree = pasta.parse(f.read(), dst)
                         for node in tree.body:
                             if pasta.dump(node) not in lst_tree_original:
                                 tree_original.body.append(node)

@@ -10,8 +10,6 @@ class Test(TestCase):
         generator.generate(path, keep_partial=False, partition=True, size_limit=1048576)
         self.assertTrue(True)
 
-
-class Test(TestCase):
     def test_partition_file(self):
         file_path = r"C:\Projects\QuantConnect\JoeYuZhou\ironpython-stubs\release\stubs\QuantConnect\Data\Consolidators.py"
         filename, file_extension = os.path.splitext(file_path)

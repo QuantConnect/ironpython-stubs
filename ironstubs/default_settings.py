@@ -15,7 +15,7 @@ debug_ = [
 PATHS = debug_
 
 ASSEMBLIES = [
-    # 'QuantConnect.Algorithm',
+    'QuantConnect.Algorithm',
     'QuantConnect.Algorithm.Framework',
     'QuantConnect.Indicators',
     'QuantConnect.Common',

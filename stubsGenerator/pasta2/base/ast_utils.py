@@ -48,15 +48,18 @@ class _TreeNormalizer(ast.NodeTransformer):
 _tree_normalizer = _TreeNormalizer()
 
 
-def parse(src):
+def parse(src, filename):
   """Replaces ast.parse; ensures additional properties on the parsed tree.
 
   This enforces the assumption that each node in the ast is unique.
   """
   try:
-    tree = ast.parse(sanitize_source(src))
+    tree = ast.parse(sanitize_source(src), filename)
   except SyntaxError as err:
     print('handling syntax error:', err)
+    raise
+  except:
+    raise
   _tree_normalizer.visit(tree)
   return tree
 

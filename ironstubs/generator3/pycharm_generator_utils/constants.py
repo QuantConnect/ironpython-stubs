@@ -564,6 +564,10 @@ PYTHONNET_CONVERSIONS = {
     'System.Collections.Generic.IReadOnlyList': 'typing.List'
 }
 
+PYTHON_KEYWORDS = [
+    'None'
+]
+
 bin_collections_names = ['collections', '_collections']
 
 for name in bin_collections_names:

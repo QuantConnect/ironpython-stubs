@@ -768,8 +768,6 @@ class ModuleRedeclarator(object):
         a_setter = "lambda self, v: None"
         a_deleter = "lambda self: None"
 
-        has_members = False
-
         for item_name in sorted_no_case(properties.keys()):
             item = properties[item_name]
             prop_docstring = getattr(item, '__doc__', None)
@@ -809,25 +807,37 @@ class ModuleRedeclarator(object):
                     if return_type is None:
                         continue
 
-                    has_members = True
                     return_type = resolve_generic_type_params(return_type.PropertyType, update_imports_for=self)
+                    if return_type == p_name:
+                        return_type = "'" + return_type + "'"
+
                     out(indent + 1, item.__name__ + ": " + return_type)
                 except Exception as e:
                     # Shouldn't ever happen, but let's cover ourselves if it does
                     print('Falling back to no PropertyType declaration for {}'.format(item.__name__))
                     print(str(e))
 
-                    has_members = True
                     out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
                 if prop_docstring:
                     pass
                     #out(indent + 1, '"""', prop_docstring, '"""')
                 out(0, "")
 
+        restricted_members = {}
+
         for item_name in sorted_no_case(class_fields.keys()):
             item = class_fields[item_name]
-            has_members = True
+
+            if item_name in PYTHON_KEYWORDS:
+                restricted_members[item_name] = item
+                continue
+
             return_type = resolve_generic_type_params(clr.GetClrType(item.FieldType), update_imports_for=self)
+            # If we're in the middle of declaring the class containing a member with the type of the class,
+            # we want to quote the type to escape it and be compliant with 
+            if return_type == p_name:
+                return_type = "'" + return_type + "'"
+
             out(indent + 1, item_name + ": " + return_type)
 
         if properties:
@@ -835,9 +845,29 @@ class ModuleRedeclarator(object):
 
         # These are class fields, we should treat them no differently from properties
         for item_name in sorted_no_case(others.keys()):
-            has_members = True
+            if item_name in PYTHON_KEYWORDS:
+                restricted_members[item_name] = item
+                continue
+
             item = others[item_name]
-            out(indent + 1, item_name + ": " + type(item).__name__)
+            return_type = type(item).__name__
+            # If we're in the middle of declaring the class containing a member with the type of the class,
+            # we want to quote the type to escape it and be compliant with 
+            if return_type == p_name:
+                return_type = "'" + return_type + "'"
+
+            out(indent + 1, item_name + ": " + return_type)
+
+        if any(restricted_members):
+            for item_name in sorted_no_case(restricted_members.keys()):
+                item = restricted_members[item_name]
+                return_type = type(item).__name__
+                # If we're in the middle of declaring the class containing a member with the type of the class,
+                # we want to quote the type to escape it and be compliant with 
+                if return_type == p_name:
+                    return_type = "'" + return_type + "'"
+
+                out(indent + 1, item_name + "_" + ": " + return_type)
 
             #self.fmt_value(out, item, indent + 1, prefix=item_name + " = ")
         if p_name == "object":

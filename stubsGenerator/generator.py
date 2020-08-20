@@ -17,7 +17,7 @@ def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
                 continue
 
             file_path = os.path.join(subdir, file)
-            with open(file_path, "r") as f:
+            with open(file_path, "r", encoding='utf-8') as f:
                 file_content = f.read()
 
             tree_original = pasta.parse(file_content, file_path)
@@ -30,7 +30,7 @@ def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
                 if os.path.exists(dst):
                     partial_files.append(dst)
                     i += 1
-                    with open(dst, "r") as f:
+                    with open(dst, "r", encoding='utf-8') as f:
                         tree = pasta.parse(f.read(), dst)
 
                     for node in tree.body:
@@ -46,7 +46,7 @@ def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
 
             elif has_partial:
                 new_code = pasta.dump(tree_original)
-                with open(file_path, "w") as f:
+                with open(file_path, "w", encoding='utf-8') as f:
                     f.write(new_code)
 
             # delete partial files
@@ -74,10 +74,11 @@ def partition_file(tree_original: Module, filename, file_extension, file_path, s
             partition.body.insert(0, import_)
 
         i += 1
-        new_filename = filename + "_" + str(i)
+        # Hides import with __
+        new_filename = "__" + filename + "_" + str(i)
         import_utils.add_import(partition, "." + new_filename + ".*", from_import=True)
 
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding='utf-8') as f:
             f.write(pasta.dump(partition))
 
         file_size = 0
@@ -89,5 +90,5 @@ def partition_file(tree_original: Module, filename, file_extension, file_path, s
         for import_ in imports:
             partition.body.insert(0, import_)
 
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding='utf-8') as f:
             f.write(pasta.dump(partition))

@@ -27,9 +27,7 @@ class Buf(object):
     def put(self, data):
         if data:
             try:
-                encoded_string = data.encode("ascii", "ignore")
-                data = encoded_string.decode()
-                self.data.append(ensureUnicode(data))
+                self.data.append(data)
             except:
                 print("Unexpected error:", sys.exc_info()[0])
                 raise
@@ -41,18 +39,9 @@ class Buf(object):
             self.put(item)
         self.put("\n")
 
-    def flush_bytes(self, outfile):
-        for data in self.data:
-            outfile.write(data.encode(OUT_ENCODING, "replace"))
-
-    def flush_str(self, outfile):
+    def flush(self, outfile):
         for data in self.data:
             outfile.write(data)
-
-    if version[0] < 3:
-        flush = flush_bytes
-    else:
-        flush = flush_str
 
     def isEmpty(self):
         return len(self.data) == 0

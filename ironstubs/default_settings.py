@@ -1,7 +1,7 @@
 import os
 
 PATHS = [
-        'C:\\Users\\Gerardo\\Projects\\QuantConnect\\Lean\\Launcher\\bin\\Debug'
+    os.getcwd()
     # | Local Binaries
     # | Revit
     #'C:\\Program Files\\Autodesk\\Revit 2017',
@@ -31,7 +31,9 @@ ASSEMBLIES = [
     #'System.Drawing',
     #'System.Windows.Forms',
     'QuantConnect.Common',
-    'QuantConnect.Algorithm'
+    'QuantConnect.Algorithm',
+    'QuantConnect.Algorithm.Framework',
+    'QuantConnect.Indicators'
     ## | Dynamo
     #'ProtoGeometry',
     #'DSCoreNodes',

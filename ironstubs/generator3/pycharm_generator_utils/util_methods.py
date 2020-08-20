@@ -714,6 +714,11 @@ def restore_clr(p_name, p_class, update_imports_for=None):
         else:
             is_static = True
 
+        # We return Pandas DataFrames when calling QCAlgorithm's History method from Python
+        if p_class.__name__ == 'QCAlgorithm' and p_name == 'History':
+            method_return[0] = 'pandas.DataFrame'
+            update_imports_for.used_imports['pandas'] = '*'
+
         yield is_static, build_signature(p_name, params, method_return=method_return[0]), None, method_return[0]
 
 def build_output_name(dirname, qualified_name):
@@ -787,7 +792,7 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
         two_dim_array = True
 
     # Required in case of array
-    class_name = class_name.replace('[]', '')
+    class_name = class_name.replace('[]', '').replace('&', '')
 
     if class_name in PYTHONNET_CONVERSIONS:
         class_name = PYTHONNET_CONVERSIONS[class_name]
@@ -804,7 +809,7 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
 
     class_name += generic_types
 
-    if IEnumerable.GetType().IsAssignableFrom(clr_type) or clr.GetClrType(Array).IsAssignableFrom(clr_type):
+    if two_dim_array or IEnumerable.GetType().IsAssignableFrom(clr_type) or clr.GetClrType(Array).IsAssignableFrom(clr_type):
         class_name = 'typing.List[{}]'.format(class_name)
 
-    return class_name.replace('[]', '').replace('&', '').replace(callable_replace, '')
+    return class_name.replace('[]', '').replace(callable_replace, '')

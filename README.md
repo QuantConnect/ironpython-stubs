@@ -5,7 +5,14 @@
 3. delete existing QC stubs under release\stubs\QuantConnect folder. Or you can uncomment line 3 - 8 to do this in the batch.
 4. run QCStubGenerator.bat for a fresh generation
 
+# Enhancements on original project
+This purpose of this project is to generate QuantConnect stubs enable local IDE intellisense.
+The original project (old generator) has following issues and are addressed in this project
+1. module overwritten: when multiple assemblies share same namespace. old generator either skipped or overwrote existing stubs.  The new generator solve this with Python ast manipulation.
+ 
+2. Old generator can't deal with non ascii characters. Error will throw. Such as in QC QuantConnect\Data\Market\Greeks.cs has method description "...the underlying asset'sprice. (∂V/∂S)..." ∂ broke the older generator
 
+3. Generated stub is too big for PyCharm (such as QuantConnect\Data\Fundamental which is over 2 Mb). The new generator splits it with a default/adjustable 1 Mb size. 
 
 
 # !The following are the readme from original author!

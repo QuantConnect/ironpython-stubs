@@ -24,7 +24,13 @@ class Buf(object):
 
     def put(self, data):
         if data:
-            self.data.append(ensureUnicode(data))
+            try:
+                encoded_string = data.encode("ascii", "ignore")
+                data = encoded_string.decode()
+                self.data.append(ensureUnicode(data))
+            except:
+                print("Unexpected error:", sys.exc_info()[0])
+                raise
 
     def out(self, indent, *what):
         """Output the arguments, indenting as needed, and adding an eol"""
@@ -612,7 +618,11 @@ class ModuleRedeclarator(object):
         @param p_modname name of module
         @param seen {class: name} map of classes already seen in the same namespace
         """
-        action("redoing class %r of module %r", p_name, p_modname)
+        if p_name=="Greeks":
+            action("redoing class %r of module %r", p_name, p_modname)
+        else:
+            action("redoing class %r of module %r", p_name, p_modname)
+
         if seen is not None:
             if p_class in seen:
                 out(indent, p_name, " = ", seen[p_class])

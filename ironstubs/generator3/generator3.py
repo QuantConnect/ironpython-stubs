@@ -14,7 +14,7 @@ from pycharm_generator_utils.clr_tools import *
 debug_mode = False
 
 
-def redo_module(module_name, outfile, module_file_name, doing_builtins):
+def redo_module(module_name, outfile, module_file_name, doing_builtins, keep_partial):
     # gobject does 'del _gobject' in its __init__.py, so the chained attribute lookup code
     # fails to find 'gobject._gobject'. thus we need to pull the module directly out of
     # sys.modules
@@ -33,7 +33,7 @@ def redo_module(module_name, outfile, module_file_name, doing_builtins):
                 report("Failed to find CLR module " + module_name)
                 break
     if mod:
-        if os.path.exists(outfile):
+        if os.path.exists(outfile) and keep_partial:
             i=0
             while (True):
                 dst=outfile+"_"+str(i)
@@ -277,7 +277,7 @@ def zip_sources(zip_path):
 
 # command-line interface
 #noinspection PyBroadException
-def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False):
+def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False, keep_partial=False):
     """
     Processes a single module named name defined in file_name (autodetect if not given).
     Returns True on success.
@@ -317,10 +317,7 @@ def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False):
             sys.meta_path.remove(my_finder)
         if imported_module_names is None:
             imported_module_names = [m for m in sys.modules.keys() if m not in old_modules]
-        if name=="QuantConnect.Data.Market":
-            redo_module(name, fname, mod_file_name, doing_builtins)
-        else:
-            redo_module(name, fname, mod_file_name, doing_builtins)
+        redo_module(name, fname, mod_file_name, doing_builtins, keep_partial=keep_partial)
         # The C library may have called Py_InitModule() multiple times to define several modules (gtk._gtk and gtk.gdk);
         # restore all of them
         path = name.split(".")

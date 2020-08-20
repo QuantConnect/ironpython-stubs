@@ -32,6 +32,6 @@ arguments = docopt(__doc__, version=__version__)
 option_path_dir = arguments['--path']
 option_keep_partial = not arguments['--keep-partial']
 option_partition = arguments['--partition']
-option_size_limit = int(arguments['--size-limit '])
+option_size_limit = int(arguments['--size-limit'])
 
 generator.generate(rootdir=option_path_dir, keep_partial=option_keep_partial, partition=option_partition, size_limit=option_size_limit)

@@ -105,7 +105,7 @@ def create_stubs(output_dir, module_path, keep_partial):
     try:
         logger.info('='*30)
         logger.info('Processing [{}]'.format(module_path))
-        process_one(module_path, None, True, output_dir, keep_partial)
+        process_one(module_path, None, True, output_dir, keep_partial=keep_partial)
     except Exception as errmsg:
         logger.error('Could not process module_path: {}'.format(module_path))
         logger.error(errmsg)

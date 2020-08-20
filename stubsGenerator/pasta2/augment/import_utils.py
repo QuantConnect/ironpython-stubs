@@ -22,7 +22,7 @@ import ast
 import copy
 import logging
 
-import errors
+from . import errors
 from ..base import ast_utils
 from ..base import scope
 

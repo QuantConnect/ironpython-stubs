@@ -1,11 +1,9 @@
 from stubsGenerator import pasta2 as pasta
-from stubsGenerator.pasta2 import augment
+from stubsGenerator.pasta2.augment import import_utils
 import os
 # for each .py file, loop through each .py_i
 # if code part not exisit, append
 # dump file out
-
-import re
 
 
 def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
@@ -16,7 +14,7 @@ def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
                 file_path = os.path.join(subdir, file)
                 tree_original = None
                 i = 0
-                partial_files=[]
+                partial_files = []
                 while (True):
                     dst = file_path + "_" + str(i)
                     if os.path.exists(dst):
@@ -52,20 +50,24 @@ def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
 
 def partition_file(tree_original,filename, file_extension,file_path, size_limit, has_partial):
     file_size = 0
-    partition = pasta.parse("", "")
+    partition = pasta.parse("")
     i = 0
     for node in tree_original.body:
         partition.body.append(node)
         file_size += len(pasta.dump(node).encode('utf-8'))
         if file_size > size_limit:
             i += 1
-            file_path = os.path.join(os.path.dirname(file_path), filename + "_" + str(i) + file_extension)
-            augment.add_import(partition, filename + "_" + str(i))
+            import_utils.add_import(partition, filename + "_" + str(i))
             with open(file_path, "w") as f:
                 f.write(pasta.dump(partition))
+
+            file_path = os.path.join(os.path.dirname(file_path), filename + "_" + str(i) + file_extension)
+            file_size = 0
+            partition = pasta.parse("")
     # has partition need to be write to include them
     if (i > 0 and file_size > 0) or has_partial:
         with open(file_path, "w") as f:
             f.write(pasta.dump(partition))
+
 
 

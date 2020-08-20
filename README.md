@@ -1,3 +1,15 @@
+
+# To generate QuantConnect stubs. 
+1. open ironstubs\default_settings.py. Edit "debug_" array (line 6-13) to point to your QC asembly location. (optional) edit "ASSEMBLIES" array (line 18-21) if you have other aseembly to include
+2. open QCStubGenerator.bat. Edit line 1 to the local location where your downloaded/cloned this project. Edit line 2 to point to your iron python's "ipy.exe" location.
+3. delete existing QC stubs under release\stubs\QuantConnect folder. Or you can uncomment line 3 - 8 to do this in the batch.
+4. run QCStubGenerator.bat for a fresh generation
+
+
+
+
+# !The following are the readme from original author!
+
 # IronPython Stubs
 
 Stubs for common IronPython CLR assemblies.

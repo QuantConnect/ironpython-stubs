@@ -14,7 +14,7 @@ The original project (old generator) has following issues and are addressed in t
 
 3. Generated stub is too big for PyCharm (such as QuantConnect\Data\Fundamental which is over 2 Mb). The new generator splits it with a default/adjustable 1 Mb size.
 
-4. Old generator can't generate some methods in QC, generated wrong code "None = None" in some stubs and used reserved word, such as "from", as parameters (which is legal in C#). They caused compilation error and broke the stubs.  New generator fix them in the stubs. <b>However a better solution could be to use the same C# to Python engine as QC uses</b>, to generate the stubs instead of IronPython. The reason is as QC C# to Python code works, that engine should be able to translate the C# code better I assume.   
+4. Old generator can't generate some methods in QC, generated wrong code "None = None" in some stubs and used reserved word, such as "from", as parameters (which is legal in C#). They caused compilation error and broke the stubs.  New generator fix them in the stubs. <b>However a better solution could be to use the same C# to Python engine as QC uses</b>, to read the assemblies instead of IronPython. The reason is as QC C# to Python code works, that engine should be able to translate the C# code better I assume.   
 
 # Credits for other projects
 Thanks for google pasta project https://github.com/google/pasta. A modify version of it is used in this project. 

@@ -6,7 +6,7 @@
 4. run QCStubGenerator.bat for a fresh generation
 
 # Enhancements on original project
-This purpose of this project is to generate QuantConnect stubs enable local IDE intellisense.
+The purpose of this project is to generate QuantConnect stubs enable local IDE intellisense.
 The original project (old generator) has following issues and are addressed in this project
 1. module overwritten: when multiple assemblies share same namespace. old generator either skipped or overwrote existing stubs.  The new generator solve this with Python ast manipulation.
  

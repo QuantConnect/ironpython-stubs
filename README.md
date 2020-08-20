@@ -12,8 +12,12 @@ The original project (old generator) has following issues and are addressed in t
  
 2. Old generator can't deal with non ascii characters. Error will throw. Such as in QC QuantConnect\Data\Market\Greeks.cs has method description "...the underlying asset'sprice. (∂V/∂S)..." ∂ broke the older generator
 
-3. Generated stub is too big for PyCharm (such as QuantConnect\Data\Fundamental which is over 2 Mb). The new generator splits it with a default/adjustable 1 Mb size. 
+3. Generated stub is too big for PyCharm (such as QuantConnect\Data\Fundamental which is over 2 Mb). The new generator splits it with a default/adjustable 1 Mb size.
 
+4. Old generator can't generate some methods in QC, generated wrong code "None = None" in some stubs and used reserved word, such as "from", as parameters (which is legal in C#). They caused compilation error and broke the stubs.  New generator fix them in the stubs. However a better solution could be to use the same C# to Python engine as QC uses, to generate the stubs instead of IronPython. The reason is as QC C# to Python code works, that engine should be able to translate the C# code better I assume.   
+
+# Credits for other projects
+Thanks for google pasta project https://github.com/google/pasta. A modify version of it is used in this project. 
 
 # !The following are the readme from original author!
 

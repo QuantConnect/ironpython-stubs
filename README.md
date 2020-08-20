@@ -8,7 +8,7 @@
 # Enhancements on original project
 The purpose of this project is to generate QuantConnect stubs enable local IDE intellisense.
 The original project (old generator) has following issues and are addressed in this project
-1. module overwritten: when multiple assemblies share same namespace. old generator either skipped or overwrote existing stubs.  The new generator solve this with Python ast manipulation.
+1. module overwritten: when multiple assemblies share same namespace. old generator either skipped or overwrote existing stubs.  The new generator solve this with Python AST manipulation.
  
 2. Old generator can't deal with non ascii characters. Error will throw. Such as in QC QuantConnect\Data\Market\Greeks.cs has method description "...the underlying asset'sprice. (∂V/∂S)..." ∂ broke the older generator
 

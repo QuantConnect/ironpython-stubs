@@ -2,6 +2,7 @@
 import atexit
 import zipfile
 import shutil
+import traceback
 
 # TODO: Move all CLR-specific functions to clr_tools
 
@@ -339,6 +340,8 @@ def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False, keep_p
                     finally:
                         action("closing %r", fname)
     except:
+        import traceback
+        print(traceback.format_exc())
         exctype, value = sys.exc_info()[:2]
         import pdb; pdb.set_trace()
         msg = "Failed to process %r while %s: %s"

@@ -531,7 +531,7 @@ def restore_parameters_for_overloads(parameter_lists, parameter_types=None, meth
             else:
                 params.append(param)
 
-        yield params, None
+        yield params, 'None'
         return
 
     #while True:
@@ -761,7 +761,15 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
         generic_args = clr_type.GetGenericTypeArguments()
 
     generic_types = ''
-    namespace = '' if clr_type.Namespace == '' else clr_type.Namespace + '.'
+    namespace = clr_type.Namespace
+    if namespace is None:
+        # Best effort, for some reason the CLR isn't playing nice with us :/
+        print('CLR namespace returned as None for type {}'.format(clr_type.FullName))
+        fullname_split = clr_type.FullName.split('+')
+        if any(fullname_split):
+            namespace = fullname_split[0]
+        
+    namespace = '' if namespace == '' else namespace + '.'
     class_name = namespace + clr_type.Name.split('`')[0]
     skip_import = False
     # We don't want to replace the [] in the callable, so let's use a placeholder
@@ -769,22 +777,22 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
     callable_replace = 'CALLABLE_REPLACE'
     if len(generic_args) != 0:
         if class_name == 'System.Action':
-            resolved_generics = [resolve_generic_type_params(t) for t in generic_args]
+            resolved_generics = [resolve_generic_type_params(t, update_imports_for=update_imports_for) for t in generic_args]
             if not any(resolved_generics) or all([generic == '' for generic in resolved_generics]):
                 resolved_generics = [callable_replace]
 
             class_name = 'typing.Callable[[' + ', '.join(resolved_generics) + '], None]'
             skip_import = True
         elif class_name == 'System.Func':
-            last_resolved = resolve_generic_type_params(generic_args[-1])
-            resolved_generics = [resolve_generic_type_params(t) for t in generic_args[:-1]]
+            last_resolved = resolve_generic_type_params(generic_args[-1], update_imports_for=update_imports_for)
+            resolved_generics = [resolve_generic_type_params(t, update_imports_for=update_imports_for) for t in generic_args[:-1]]
             if not any(resolved_generics):
                 resolved_generics = [callable_replace]
 
             class_name = 'typing.Callable[[' + ', '.join(resolved_generics) + '], ' + last_resolved + ']'
             skip_import = True
         else:
-            generic_types = '[' + ', '.join([resolve_generic_type_params(t) for t in generic_args]) + ']'
+            generic_types = '[' + ', '.join([resolve_generic_type_params(t, update_imports_for=update_imports_for) for t in generic_args]) + ']'
 
     two_dim_array = False
     if '[,]' in class_name:
@@ -805,7 +813,8 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
         # Update imports, including for all generic type params and the typing builtin
         update_imports_for.used_imports['typing'] = '*'
         update_imports_for.used_imports['datetime'] = '*'
-        update_imports_for.used_imports['.' if clr_type.Namespace == '' else clr_type.Namespace] = '*'
+        # Remove last char from namespace, we don't need the final dot anymore
+        update_imports_for.used_imports['.' if namespace == '' else namespace[:-1]] = '*'
 
     class_name += generic_types
 

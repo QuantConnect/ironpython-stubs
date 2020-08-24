@@ -539,7 +539,7 @@ class ModuleRedeclarator(object):
             for is_static, spec, sig_note, method_return in restored_clr_methods:
                 if is_static:
                     out(indent, "@staticmethod")
-                if not spec:
+                if spec is None:
                     return
                 
                 # Replace any parameter that uses a prohibited keyword
@@ -823,7 +823,7 @@ class ModuleRedeclarator(object):
 
             return_type = resolve_generic_type_params(clr.GetClrType(item.FieldType), update_imports_for=self)
             # If we're in the middle of declaring the class containing a member with the type of the class,
-            # we want to quote the type to escape it and be compliant with 
+            # we want to quote the type to escape it and be compliant with PEP typing standards
             if return_type == p_name:
                 return_type = "'" + return_type + "'"
 

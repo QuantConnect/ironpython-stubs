@@ -1,5 +1,7 @@
 import keyword
 
+import clr
+from System.Reflection import BindingFlags
 from util_methods import *
 from constants import *
 
@@ -24,7 +26,11 @@ class Buf(object):
 
     def put(self, data):
         if data:
-            self.data.append(ensureUnicode(data))
+            try:
+                self.data.append(data)
+            except:
+                print("Unexpected error:", sys.exc_info()[0])
+                raise
 
     def out(self, indent, *what):
         """Output the arguments, indenting as needed, and adding an eol"""
@@ -33,18 +39,9 @@ class Buf(object):
             self.put(item)
         self.put("\n")
 
-    def flush_bytes(self, outfile):
-        for data in self.data:
-            outfile.write(data.encode(OUT_ENCODING, "replace"))
-
-    def flush_str(self, outfile):
+    def flush(self, outfile):
         for data in self.data:
             outfile.write(data)
-
-    if version[0] < 3:
-        flush = flush_bytes
-    else:
-        flush = flush_str
 
     def isEmpty(self):
         return len(self.data) == 0
@@ -450,8 +447,9 @@ class ModuleRedeclarator(object):
                 else:
                     ret_literal = None
                 param_lists = [result[0] for result in docstring_results]
-                spec = build_signature(func_name, restore_parameters_for_overloads(param_lists))
-                return (spec, ret_literal, "restored from __doc__ with multiple overloads")
+                for parameters, _ in param_lists:
+                    spec = build_signature(func_name, restore_parameters_for_overloads(parameters))
+                    return (spec, ret_literal, "restored from __doc__ with multiple overloads")
 
         # find the first thing to look like a definition
         prefix_re = re.compile("\s*(?:(\w+)[ \\t]+)?" + func_id + "\s*\(") # "foo(..." or "int foo(..."
@@ -484,6 +482,7 @@ class ModuleRedeclarator(object):
                id() because *some* functions are unhashable (eg _elementtree.Comment in py2.7)
         """
         action("redoing func %r of class %r", p_name, p_class)
+
         if seen is not None:
             other_func = seen.get(id(p_func), None)
             if other_func and getattr(other_func, "__doc__", None) is getattr(p_func, "__doc__", None):
@@ -534,16 +533,40 @@ class ModuleRedeclarator(object):
             out(indent, "def ", spec, ": # ", sig_note)
             out_doc_attr(out, p_func, indent + 1, p_class)
         elif sys.platform == 'cli' and is_clr_type(p_class):
-            is_static, spec, sig_note = restore_clr(p_name, p_class)
-            if is_static:
-                out(indent, "@staticmethod")
-            if not spec: return
-            if sig_note:
-                out(indent, "def ", spec, ": #", sig_note)
-            else:
-                out(indent, "def ", spec, ":")
-            if not p_name in ['__gt__', '__ge__', '__lt__', '__le__', '__ne__', '__reduce_ex__', '__str__']:
-                out_doc_attr(out, p_func, indent + 1, p_class)
+            restored_clr_methods = list(restore_clr(p_name, p_class, update_imports_for=self))
+            overloaded = len(restored_clr_methods) > 1
+
+            for is_static, spec, sig_note, method_return in restored_clr_methods:
+                if is_static:
+                    out(indent, "@staticmethod")
+                if spec is None:
+                    return
+                
+                # Replace any parameter that uses a prohibited keyword
+                spec = spec.replace('from:', 'from_:').replace('lambda:', 'lambda_:')
+
+                if overloaded:
+                    out(indent, "@typing.overload")
+                if sig_note:
+                    out(indent, "def ", spec, ": #", sig_note)
+                else:
+                    out(indent, "def ", spec, ":")
+                if not p_name in ['__gt__', '__ge__', '__lt__', '__le__', '__ne__', '__reduce_ex__', '__str__']:
+                    pass
+                    # TODO: No docs for now, since they're very noisy
+                    #out_doc_attr(out, p_func, indent + 1, p_class)
+                
+                out(indent + 1, "pass")
+                out(0, "")
+
+            if overloaded:
+                # Use the last method return to set the overloaded method
+                out(indent, "def " + p_name + "(self, *args) -> " + method_return + ":")
+                out(indent + 1, "pass")
+                out(0, "")
+
+            return
+
         elif mod_class_method_tuple in PREDEFINED_MOD_CLASS_SIGS:
             sig, ret_literal = PREDEFINED_MOD_CLASS_SIGS[mod_class_method_tuple]
             if classname:
@@ -612,7 +635,11 @@ class ModuleRedeclarator(object):
         @param p_modname name of module
         @param seen {class: name} map of classes already seen in the same namespace
         """
-        action("redoing class %r of module %r", p_name, p_modname)
+        if p_name=="Greeks":
+            action("redoing class %r of module %r", p_name, p_modname)
+        else:
+            action("redoing class %r of module %r", p_name, p_modname)
+
         if seen is not None:
             if p_class in seen:
                 out(indent, p_name, " = ", seen[p_class])
@@ -633,7 +660,14 @@ class ModuleRedeclarator(object):
                     skipped_bases.append(str(base))
                     continue
                     # somehow import every base class
-                base_name = base.__name__
+
+                clr_type = clr.GetClrType(base)
+                if clr_type is not None:
+                    namespace = '' if clr_type.Namespace == '' else clr_type.Namespace + '.'
+                    base_name = namespace + base.__name__
+                else:
+                    base_name = base.__name__
+
                 qual_module_name = qualifier_of(base, skip_qualifiers)
                 got_existing_import = False
                 if qual_module_name:
@@ -661,6 +695,7 @@ class ModuleRedeclarator(object):
         # inner parts
         methods = {}
         properties = {}
+        class_fields = {}
         others = {}
         we_are_the_base_class = p_modname == BUILTIN_MOD_NAME and p_name == "object"
         field_source = {}
@@ -693,6 +728,8 @@ class ModuleRedeclarator(object):
                 methods[item_name] = item
             elif is_property(item):
                 properties[item_name] = item
+            elif is_field(item):
+                class_fields[item_name] = item
             else:
                 others[item_name] = item
                 #
@@ -719,6 +756,7 @@ class ModuleRedeclarator(object):
         known_props = KNOWN_PROPS.get(p_modname, {})
         a_setter = "lambda self, v: None"
         a_deleter = "lambda self: None"
+
         for item_name in sorted_no_case(properties.keys()):
             item = properties[item_name]
             prop_docstring = getattr(item, '__doc__', None)
@@ -732,29 +770,95 @@ class ModuleRedeclarator(object):
                     getter, prop_type = getter_and_type
                 else:
                     getter, prop_type = None, None
-                out(indent + 1, item_name,
-                    " = property(", format_accessors(acc_line, getter, a_setter, a_deleter), ")"
-                )
+                #out(indent + 1, item_name,
+                #    " = property(", format_accessors(acc_line, getter, a_setter, a_deleter), ")"
+                #)
                 if prop_type:
+                    getter = '""":type"""' == "Get"
+
+                        #out(0, "")
+                    #else:
+                    #    out(indent + 1, '""":type: ', prop_type, '"""')
+
+                    out(indent + 1, "@property" if getter else ("@" + prop_type.split("(")[0] + ".setter"))
+                    out(indent + 1, "definately ", prop_type, ':')
                     if prop_docstring:
-                        out(indent + 1, '"""', prop_docstring)
-                        out(0, "")
-                        out(indent + 1, ':type: ', prop_type)
-                        out(indent + 1, '"""')
-                    else:
-                        out(indent + 1, '""":type: ', prop_type, '"""')
+                        out(indent + 1, '"""', prop_docstring, '"""')
+                    out(indent + 1, "pass")
+
                     out(0, "")
             else:
-                out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
+
+                try:
+                    property_class = clr.GetClrType(item.__objclass__)
+                    return_type = property_class.GetProperty(item.__name__, BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                        
+                    if return_type is None:
+                        continue
+
+                    return_type = resolve_generic_type_params(return_type.PropertyType, update_imports_for=self)
+                    if return_type == p_name:
+                        return_type = "'" + return_type + "'"
+
+                    out(indent + 1, item.__name__ + ": " + return_type)
+                except Exception as e:
+                    # Shouldn't ever happen, but let's cover ourselves if it does
+                    print('Falling back to no PropertyType declaration for {}'.format(item.__name__))
+                    print(str(e))
+
+                    out(indent + 1, item_name, " = property(lambda self: object(), lambda self, v: None, lambda self: None)  # default")
                 if prop_docstring:
-                    out(indent + 1, '"""', prop_docstring, '"""')
+                    pass
+                    #out(indent + 1, '"""', prop_docstring, '"""')
                 out(0, "")
+
+        restricted_members = {}
+
+        for item_name in sorted_no_case(class_fields.keys()):
+            item = class_fields[item_name]
+
+            if item_name in PYTHON_KEYWORDS:
+                restricted_members[item_name] = item
+                continue
+
+            return_type = resolve_generic_type_params(clr.GetClrType(item.FieldType), update_imports_for=self)
+            # If we're in the middle of declaring the class containing a member with the type of the class,
+            # we want to quote the type to escape it and be compliant with PEP typing standards
+            if return_type == p_name:
+                return_type = "'" + return_type + "'"
+
+            out(indent + 1, item_name + ": " + return_type)
+
         if properties:
             out(0, "") # empty line after the block
-            #
+
+        # These are class fields, we should treat them no differently from properties
         for item_name in sorted_no_case(others.keys()):
+            if item_name in PYTHON_KEYWORDS:
+                restricted_members[item_name] = item
+                continue
+
             item = others[item_name]
-            self.fmt_value(out, item, indent + 1, prefix=item_name + " = ")
+            return_type = type(item).__name__
+            # If we're in the middle of declaring the class containing a member with the type of the class,
+            # we want to quote the type to escape it and be compliant with 
+            if return_type == p_name:
+                return_type = "'" + return_type + "'"
+
+            out(indent + 1, item_name + ": " + return_type)
+
+        if any(restricted_members):
+            for item_name in sorted_no_case(restricted_members.keys()):
+                item = restricted_members[item_name]
+                return_type = type(item).__name__
+                # If we're in the middle of declaring the class containing a member with the type of the class,
+                # we want to quote the type to escape it and be compliant with 
+                if return_type == p_name:
+                    return_type = "'" + return_type + "'"
+
+                out(indent + 1, item_name + "_" + ": " + return_type)
+
+            #self.fmt_value(out, item, indent + 1, prefix=item_name + " = ")
         if p_name == "object":
             out(indent + 1, "__module__ = ''")
         if others:
@@ -1074,35 +1178,36 @@ class ModuleRedeclarator(object):
                 import_names = self.used_imports[mod_name]
                 if import_names:
                     self._defined[mod_name] = True
-                    right_pos = 0 # tracks width of list to fold it at right margin
-                    import_heading = "from % s import (" % mod_name
-                    right_pos += len(import_heading)
-                    names_pack = [import_heading]
-                    indent_level = 0
-                    import_names = list(import_names)
-                    import_names.sort()
-                    for n in import_names:
-                        self._defined[n] = True
-                        len_n = len(n)
-                        if right_pos + len_n >= 78:
-                            out(indent_level, *names_pack)
-                            names_pack = [n, ", "]
-                            if indent_level == 0:
-                                indent_level = 1 # all but first line is indented
-                            right_pos = self.indent_size + len_n + 2
-                        else:
-                            names_pack.append(n)
-                            names_pack.append(", ")
-                            right_pos += (len_n + 2)
-                            # last line is...
-                    if indent_level == 0: # one line
-                        names_pack[0] = names_pack[0][:-1] # cut off lpar
-                        names_pack[-1] = "" # cut last comma
-                    else: # last line of multiline
-                        names_pack[-1] = ")" # last comma -> rpar
-                    out(indent_level, *names_pack)
+                    #right_pos = 0 # tracks width of list to fold it at right margin
+                    #import_heading = "import % s (" % mod_name
+                    out(0, "import {}".format(mod_name))
+                    #right_pos += len(import_heading)
+                    #names_pack = [import_heading]
+                    #indent_level = 0
+                    #import_names = list(import_names)
+                    #import_names.sort()
+                    #for n in import_names:
+                    #    self._defined[n] = True
+                    #    len_n = len(n)
+                    #    if right_pos + len_n >= 78:
+                    #        out(indent_level, *names_pack)
+                    #        names_pack = [n, ", "]
+                    #        if indent_level == 0:
+                    #            indent_level = 1 # all but first line is indented
+                    #        right_pos = self.indent_size + len_n + 2
+                    #    else:
+                    #        names_pack.append(n)
+                    #        names_pack.append(", ")
+                    #        right_pos += (len_n + 2)
+                    #        # last line is...
+                    #if indent_level == 0: # one line
+                    #    names_pack[0] = names_pack[0][:-1] # cut off lpar
+                    #    names_pack[-1] = "" # cut last comma
+                    #else: # last line of multiline
+                    #    names_pack[-1] = ")" # last comma -> rpar
+                    #out(indent_level, *names_pack)
 
-                    out(0, "") # empty line after group
+                    #out(0, "") # empty line after group
 
         if self.hidden_imports:
             self.add_import_header_if_needed()

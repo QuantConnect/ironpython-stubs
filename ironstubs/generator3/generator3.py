@@ -2,6 +2,7 @@
 import atexit
 import zipfile
 import shutil
+import traceback
 
 # TODO: Move all CLR-specific functions to clr_tools
 
@@ -14,7 +15,7 @@ from pycharm_generator_utils.clr_tools import *
 debug_mode = False
 
 
-def redo_module(module_name, outfile, module_file_name, doing_builtins):
+def redo_module(module_name, outfile, module_file_name, doing_builtins, keep_partial):
     # gobject does 'del _gobject' in its __init__.py, so the chained attribute lookup code
     # fails to find 'gobject._gobject'. thus we need to pull the module directly out of
     # sys.modules
@@ -33,11 +34,36 @@ def redo_module(module_name, outfile, module_file_name, doing_builtins):
                 report("Failed to find CLR module " + module_name)
                 break
     if mod:
+        if os.path.exists(outfile) and keep_partial:
+            i=0
+            while (True):
+                dst=outfile+"_"+str(i)
+                if os.path.exists(dst):
+                    i+=1
+                    continue
+                else:
+                    shutil.copyfile(outfile, dst)
+                    break
+
+        #testfile="E:\\Projects\\QuantConnect\\ironpython2\\bin\\Debug\\net45\\Lib\\release\\stubs\\Rhino\\Runtime\\InteropWrappers.py"
+        #with open(testfile, "r") as f:
+        #    tree_old = pasta.parse(f.read())
+
         action("restoring")
         r = ModuleRedeclarator(mod, outfile, module_file_name, doing_builtins=doing_builtins)
         r.redo(module_name, ".".join(mod_path[:-1]) in MODULES_INSPECT_DIR)
         action("flushing")
         r.flush()
+
+        with open(outfile, "r") as f:
+            f.read()
+        #for node in tree_old.body:
+        #    if node in tree_new.body:
+        #        #tree_new.body.append(node)
+        #        print("")
+        #new_module_code = pasta.dump(tree_new)
+        #with open(outfile, 'w') as new_file:
+        #    new_file.write(new_module_code)
     else:
         report("Failed to find imported module in sys.modules " + module_name)
 
@@ -252,7 +278,7 @@ def zip_sources(zip_path):
 
 # command-line interface
 #noinspection PyBroadException
-def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False):
+def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False, keep_partial=False):
     """
     Processes a single module named name defined in file_name (autodetect if not given).
     Returns True on success.
@@ -292,8 +318,7 @@ def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False):
             sys.meta_path.remove(my_finder)
         if imported_module_names is None:
             imported_module_names = [m for m in sys.modules.keys() if m not in old_modules]
-
-        redo_module(name, fname, mod_file_name, doing_builtins)
+        redo_module(name, fname, mod_file_name, doing_builtins, keep_partial=keep_partial)
         # The C library may have called Py_InitModule() multiple times to define several modules (gtk._gtk and gtk.gdk);
         # restore all of them
         path = name.split(".")
@@ -315,6 +340,8 @@ def process_one(name, mod_file_name, doing_builtins, subdir, quiet=False):
                     finally:
                         action("closing %r", fname)
     except:
+        import traceback
+        print(traceback.format_exc())
         exctype, value = sys.exc_info()[:2]
         import pdb; pdb.set_trace()
         msg = "Failed to process %r while %s: %s"

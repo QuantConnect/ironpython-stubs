@@ -2,3 +2,6 @@
 __pycache__
 *.pyc
 release/testing
+release
+.idea
+logs

@@ -40,6 +40,7 @@ from utils.logger import logger
 from generator3.generator3 import process_one
 
 
+
 def is_namespace(something):
     """ Returns True if object is Namespace: Module """
     if isinstance(something, type(System)):
@@ -99,12 +100,12 @@ def stub_exists(output_dir, module_path):
     exists = os.path.exists(path) or os.path.exists(path + '.py')
     return exists
 
-def create_stubs(output_dir, module_path):
+def create_stubs(output_dir, module_path, keep_partial):
     """ Actually Make Stubs """
     try:
         logger.info('='*30)
         logger.info('Processing [{}]'.format(module_path))
-        process_one(module_path, None, True, output_dir)
+        process_one(module_path, None, True, output_dir, keep_partial=keep_partial)
     except Exception as errmsg:
         logger.error('Could not process module_path: {}'.format(module_path))
         logger.error(errmsg)
@@ -128,7 +129,7 @@ def dump_json_log(namespaces_dict):
     with open(filepath, 'w') as fp:
         json.dump(namespaces_dict, fp, indent=2)
 
-def make(output_dir, assembly_or_builtin, overwrite=False, quiet=False):
+def make(output_dir, assembly_or_builtin, overwrite=False, quiet=False, keep_partial=False):
     """ Main Processing Function """
     assembly_dict = {}
     print('='*80)
@@ -160,8 +161,9 @@ def make(output_dir, assembly_or_builtin, overwrite=False, quiet=False):
     else:
         for assembly, modules in assembly_dict.items():
             for module_path in modules.keys():
-                if not stub_exists(output_dir, module_path) or overwrite:
-                    create_stubs(output_dir, module_path)
+                # new option to generate partial class stub
+                if not stub_exists(output_dir, module_path) or overwrite or keep_partial:
+                    create_stubs(output_dir, module_path, keep_partial)
                 else:
                     logger.info('Skipping [{}] Already Exists'.format(module_path))
             for module_path in modules.keys():

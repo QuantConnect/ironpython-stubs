@@ -167,13 +167,10 @@ else:
             return data.decode(OUT_ENCODING, 'replace')
         return str(data)
 
-if version[0] > 2:
-    import io  # in 3.0
+import io  # in 3.0
 
-    #noinspection PyArgumentList
-    fopen = lambda name, mode: io.open(name, mode, encoding=OUT_ENCODING)
-else:
-    fopen = open
+#noinspection PyArgumentList
+fopen = lambda name, mode: io.open(name, mode, encoding=OUT_ENCODING)
 
 if sys.platform == 'cli':
     #noinspection PyUnresolvedReferences
@@ -534,6 +531,42 @@ PREDEFINED_MOD_CLASS_SIGS = {                                       #TODO: user-
     ("numpy.core.multiarray", "ndarray", "reshape"): ("(self, shape, *shapes, order='C')", None),
     ("numpy.core.multiarray", "ndarray", "resize"): ("(self, *new_shape, refcheck=True)", None),
 }
+
+PYTHONNET_CONVERSIONS = {
+    'System.Boolean': 'bool',
+    'System.Byte': 'bytes',
+    'System.SByte': 'bytes',
+    'System.Char': 'str',
+    'System.Decimal': 'float',
+    'System.Double': 'float',
+    'System.Float': 'float',
+    'System.Single': 'float',
+    'System.Int32': 'int',
+    'System.UInt32': 'int',
+    'System.Int64': 'int',
+    'System.UInt64': 'int',
+    'System.Int16': 'int',
+    'System.UInt16': 'int',
+    
+    'System.Object': 'object',
+    'System.object': 'object',
+    'System.String': 'str',
+
+    'System.Type': 'type',
+    'System.DateTime': 'datetime.datetime',
+    'System.TimeSpan': 'datetime.timedelta',
+    'System.Nullable': 'typing.Optional',
+
+    'System.Collections.Generic.List': 'typing.List',
+    'System.Collections.Generic.IList': 'typing.List',
+    'System.Collections.Generic.ICollection': 'typing.List',
+    'System.Collections.Generic.IEnumerable': 'typing.List',
+    'System.Collections.Generic.IReadOnlyList': 'typing.List'
+}
+
+PYTHON_KEYWORDS = [
+    'None'
+]
 
 bin_collections_names = ['collections', '_collections']
 

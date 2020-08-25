@@ -1,6 +1,7 @@
 from constants import *
 import keyword
 
+
 try:
     import inspect
 except ImportError:
@@ -282,6 +283,8 @@ _prop_types = tuple(_prop_types)
 def is_property(x):
     return isinstance(x, _prop_types)
 
+def is_field(x):
+    return 'FieldType' in dir(x)
 
 def sanitize_ident(x, is_clr=False):
     """Takes an identifier and returns it sanitized"""
@@ -519,36 +522,56 @@ def restore_by_inspect(p_func):
         spec.append("**" + kwarg)
     return flatten(spec)
 
-def restore_parameters_for_overloads(parameter_lists):
-    param_index = 0
-    star_args = False
-    optional = False
-    params = []
-    while True:
-        parameter_lists_copy = [pl for pl in parameter_lists]
-        for pl in parameter_lists_copy:
-            if param_index >= len(pl):
-                parameter_lists.remove(pl)
-                optional = True
-        if not parameter_lists:
-            break
-        name = parameter_lists[0][param_index]
-        for pl in parameter_lists[1:]:
-            if pl[param_index] != name:
-                star_args = True
-                break
-        if star_args: break
-        if optional and not '=' in name:
-            params.append(name + '=None')
-        else:
-            params.append(name)
-        param_index += 1
-    if star_args:
-        params.append("*__args")
-    return params
+def restore_parameters_for_overloads(parameter_lists, parameter_types=None, method_returns=None):
+    if parameter_types is None or method_returns is None:
+        params = []
+        for param in parameter_lists:
+            if '=' in param:
+                params.append(param + '=None')
+            else:
+                params.append(param)
 
-def build_signature(p_name, params):
-    return p_name + '(' + ', '.join(params) + ')'
+        yield params, 'None'
+        return
+
+    #while True:
+        #parameter_lists_copy = [pl for pl in parameter_lists]
+        #parameter_types_copy = [pt for pt in parameter_types]
+
+        #for (pl, pt) in zip(parameter_lists_copy, parameter_types_copy):
+        ##for pl in parameter_lists_copy:
+        #    #print(pl)
+        #    if param_index >= len(pl):
+        #        parameter_lists.remove(pl)
+        #        parameter_types.remove(pt)
+        #        optional = True
+
+        #if not parameter_lists:
+        #    break
+
+    for ((parameters, param_types), method) in zip(zip(parameter_lists, parameter_types), method_returns):
+        params = []
+
+        for (param, param_type) in zip(parameters, param_types):
+            #for (pl, pt) in zip(parameter_lists[1:], parameter_types[1:]):
+            ##for pl in parameter_lists[1:]:
+            #    if pl[param_index] != name:
+            #        star_args = True
+            #        break
+            #if star_args: break
+
+            if '=' in param:
+                params.append(param + ": " + "Optional[" + param_type + "]" + '=None')
+            else:
+                params.append(param + ": " + param_type)
+    #if star_args:
+    #    params.append("*__args")
+        yield params, method
+
+def build_signature(p_name, params, method_return=None):
+    if method_return is None:
+        return p_name + '(' + ', '.join(params) + ')'
+    return p_name + '(' + ', '.join(params) + ') -> ' + method_return
 
 
 def propose_first_param(deco):
@@ -571,7 +594,8 @@ def handle_error_func(item_name, out):
     msg = "Error generating skeleton for function %s: %s"
     args = item_name, value
     report(msg, *args)
-    out(0, "# " + msg % args)
+    #out(2, "# " + msg % args)
+    out(2, "pass")
     out(0, "")
 
 def format_accessors(accessor_line, getter, setter, deleter):
@@ -628,6 +652,10 @@ import sys
 if sys.platform == 'cli':
     #noinspection PyUnresolvedReferences
     import clr
+    clr.AddReference("System")
+    clr.AddReference("System.Collections")
+    from System import Array
+    from System.Collections import IEnumerable
 
 # http://blogs.msdn.com/curth/archive/2009/03/29/an-ironpython-profiler.aspx
 def print_profile():
@@ -646,36 +674,52 @@ def is_clr_type(clr_type):
     except TypeError:
         return False
 
-def restore_clr(p_name, p_class):
+def restore_clr(p_name, p_class, update_imports_for=None):
     """
     Restore the function signature by the CLR type signature
-    :return (is_static, spec, sig_note)
+    :return (is_static, spec, sig_note, overloaded: bool)
     """
     clr_type = clr.GetClrType(p_class)
     if p_name == '__new__':
         methods = [c for c in clr_type.GetConstructors()]
         if not methods:
-            return False, p_name + '(self, *args)', 'cannot find CLR constructor' # "self" is always first argument of any non-static method
+            yield False, p_name + '(self, *args)', 'cannot find CLR constructor', 'None'# "self" is always first argument of any non-static method
+            return
     else:
         methods = [m for m in clr_type.GetMethods() if m.Name == p_name]
         if not methods:
             bases = p_class.__bases__
             if len(bases) == 1 and p_name in dir(bases[0]):
                 # skip inherited methods
-                return False, None, None
-            return False, p_name + '(self, *args)', 'cannot find CLR method'
+                yield False, None, None, 'None'
+                return
+
+            yield False, None, None, 'None'#p_name + '(self, *args)', 'cannot find CLR method', 'None'
+            return
             # "self" is always first argument of any non-static method
 
     parameter_lists = []
+    parameter_types = []
+    method_returns = []
     for m in methods:
         parameter_lists.append([p.Name for p in m.GetParameters()])
-    params = restore_parameters_for_overloads(parameter_lists)
-    is_static = False
-    if not methods[0].IsStatic:
-        params = ['self'] + params
-    else:
-        is_static = True
-    return is_static, build_signature(p_name, params), None
+        parameter_types.append([resolve_generic_type_params(t.ParameterType, update_imports_for=update_imports_for) for t in m.GetParameters()])
+        return_type = m.ReturnType if m.Name != '.ctor' else None
+        method_returns.append([resolve_generic_type_params(return_type, update_imports_for=update_imports_for)])
+
+    for (params, method_return) in restore_parameters_for_overloads(parameter_lists, parameter_types, method_returns):
+        is_static = False
+        if not methods[0].IsStatic:
+            params = ['self'] + params
+        else:
+            is_static = True
+
+        # We return Pandas DataFrames when calling QCAlgorithm's History method from Python
+        if p_class.__name__ == 'QCAlgorithm' and p_name == 'History':
+            method_return[0] = 'pandas.DataFrame'
+            update_imports_for.used_imports['pandas'] = '*'
+
+        yield is_static, build_signature(p_name, params, method_return=method_return[0]), None, method_return[0]
 
 def build_output_name(dirname, qualified_name):
     qualifiers = qualified_name.split(".")
@@ -704,3 +748,77 @@ def build_output_name(dirname, qualified_name):
         os.makedirs(dirname)
 
     return fname
+
+def resolve_generic_type_params(clr_type, update_imports_for=None):
+    if clr_type is None or (clr_type.Name == 'Void' and clr_type.Namespace == 'System'):
+        return 'None'
+
+    generic_args = clr_type.GenericTypeArguments
+    type_arg_count = len(generic_args)
+
+    if clr_type.IsGenericType and type_arg_count == 0:
+        clr_type = clr_type.GetGenericTypeDefinition()
+        generic_args = clr_type.GetGenericTypeArguments()
+
+    generic_types = ''
+    namespace = clr_type.Namespace
+    if namespace is None:
+        # Best effort, for some reason the CLR isn't playing nice with us :/
+        print('CLR namespace returned as None for type {}'.format(clr_type.FullName))
+        fullname_split = clr_type.FullName.split('+')
+        if any(fullname_split):
+            namespace = fullname_split[0]
+        
+    namespace = '' if namespace == '' else namespace + '.'
+    class_name = namespace + clr_type.Name.split('`')[0]
+    skip_import = False
+    # We don't want to replace the [] in the callable, so let's use a placeholder
+    # value instead to replace at the end to strip it out of the final spec
+    callable_replace = 'CALLABLE_REPLACE'
+    if len(generic_args) != 0:
+        if class_name == 'System.Action':
+            resolved_generics = [resolve_generic_type_params(t, update_imports_for=update_imports_for) for t in generic_args]
+            if not any(resolved_generics) or all([generic == '' for generic in resolved_generics]):
+                resolved_generics = [callable_replace]
+
+            class_name = 'typing.Callable[[' + ', '.join(resolved_generics) + '], None]'
+            skip_import = True
+        elif class_name == 'System.Func':
+            last_resolved = resolve_generic_type_params(generic_args[-1], update_imports_for=update_imports_for)
+            resolved_generics = [resolve_generic_type_params(t, update_imports_for=update_imports_for) for t in generic_args[:-1]]
+            if not any(resolved_generics):
+                resolved_generics = [callable_replace]
+
+            class_name = 'typing.Callable[[' + ', '.join(resolved_generics) + '], ' + last_resolved + ']'
+            skip_import = True
+        else:
+            generic_types = '[' + ', '.join([resolve_generic_type_params(t, update_imports_for=update_imports_for) for t in generic_args]) + ']'
+
+    two_dim_array = False
+    if '[,]' in class_name:
+        class_name = class_name.replace('[,]', '')
+        two_dim_array = True
+
+    # Required in case of array
+    class_name = class_name.replace('[]', '').replace('&', '')
+
+    if class_name in PYTHONNET_CONVERSIONS:
+        class_name = PYTHONNET_CONVERSIONS[class_name]
+        if two_dim_array:
+            class_name = 'typing.List[' + class_name + ']'
+
+        skip_import = '.' not in class_name or class_name.startswith('typing.')
+
+    if update_imports_for is not None and not skip_import:
+        # Update imports, including for all generic type params and the typing builtin
+        update_imports_for.used_imports['typing'] = '*'
+        update_imports_for.used_imports['datetime'] = '*'
+        # Remove last char from namespace, we don't need the final dot anymore
+        update_imports_for.used_imports['.' if namespace == '' else namespace[:-1]] = '*'
+
+    class_name += generic_types
+
+    if two_dim_array or IEnumerable.GetType().IsAssignableFrom(clr_type) or clr.GetClrType(Array).IsAssignableFrom(clr_type):
+        class_name = 'typing.List[{}]'.format(class_name)
+
+    return class_name.replace('[]', '').replace(callable_replace, '')

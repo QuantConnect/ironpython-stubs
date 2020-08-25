@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{76a0a5f0-9d21-455e-8d98-4bc39a68c45f}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>default_settings.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>CondaEnv|CondaEnv|Anaconda3</InterpreterId>
+    <Name>ironstubs</Name>
+    <IsWindowsApplication>False</IsWindowsApplication>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="default_settings.py" />
+    <Compile Include="generator3\generator3.py" />
+    <Compile Include="generator3\pycharm_generator_utils\clr_tools.py" />
+    <Compile Include="generator3\pycharm_generator_utils\constants.py" />
+    <Compile Include="generator3\pycharm_generator_utils\module_redeclarator.py" />
+    <Compile Include="generator3\pycharm_generator_utils\pyparsing.py" />
+    <Compile Include="generator3\pycharm_generator_utils\pyparsing_py3.py" />
+    <Compile Include="generator3\pycharm_generator_utils\util_methods.py" />
+    <Compile Include="generator3\pycharm_generator_utils\__init__.py" />
+    <Compile Include="generator3\test.py" />
+    <Compile Include="generator3\__init__.py" />
+    <Compile Include="make_stubs.py" />
+    <Compile Include="generator3\pasta2\augment\errors.py" />
+    <Compile Include="generator3\pasta2\augment\import_utils.py" />
+    <Compile Include="generator3\pasta2\augment\import_utils_test.py" />
+    <Compile Include="generator3\pasta2\augment\inline.py" />
+    <Compile Include="generator3\pasta2\augment\inline_test.py" />
+    <Compile Include="generator3\pasta2\augment\rename.py" />
+    <Compile Include="generator3\pasta2\augment\rename_test.py" />
+    <Compile Include="generator3\pasta2\augment\__init__.py" />
+    <Compile Include="generator3\pasta2\base\annotate.py" />
+    <Compile Include="generator3\pasta2\base\annotate_test.py" />
+    <Compile Include="generator3\pasta2\base\ast_constants.py" />
+    <Compile Include="generator3\pasta2\base\ast_utils.py" />
+    <Compile Include="generator3\pasta2\base\ast_utils_test.py" />
+    <Compile Include="generator3\pasta2\base\codegen.py" />
+    <Compile Include="generator3\pasta2\base\codegen_test.py" />
+    <Compile Include="generator3\pasta2\base\formatting.py" />
+    <Compile Include="generator3\pasta2\base\fstring_utils.py" />
+    <Compile Include="generator3\pasta2\base\scope.py" />
+    <Compile Include="generator3\pasta2\base\scope_test.py" />
+    <Compile Include="generator3\pasta2\base\test_utils.py" />
+    <Compile Include="generator3\pasta2\base\test_utils_test.py" />
+    <Compile Include="generator3\pasta2\base\token_generator.py" />
+    <Compile Include="generator3\pasta2\base\__init__.py" />
+    <Compile Include="generator3\pasta2\__init__.py" />
+    <Compile Include="process_stubs.py" />
+    <Compile Include="revit.py" />
+    <Compile Include="utils\docopt.py" />
+    <Compile Include="utils\helper.py" />
+    <Compile Include="utils\logger.py" />
+    <Compile Include="utils\__init__.py" />
+    <Compile Include="__init__.py" />
+    <Compile Include="__main__.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="generator3" />
+    <Folder Include="generator3\pycharm_generator_utils" />
+    <Folder Include="generator3\pasta2\" />
+    <Folder Include="generator3\pasta2\augment\" />
+    <Folder Include="generator3\pasta2\base\" />
+    <Folder Include="utils" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="CondaEnv|CondaEnv|Anaconda3" />
+    <InterpreterReference Include="CondaEnv|CondaEnv|py27" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="QCStubGenerator.bat">
+      <SubType>Code</SubType>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>

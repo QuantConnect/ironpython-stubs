@@ -680,7 +680,9 @@ def restore_clr(p_name, p_class, update_imports_for=None):
     :return (is_static, spec, sig_note, overloaded: bool)
     """
     clr_type = clr.GetClrType(p_class)
+
     if p_name == '__new__':
+        p_name = '__init__'
         methods = [c for c in clr_type.GetConstructors()]
         if not methods:
             yield False, p_name + '(self, *args)', 'cannot find CLR constructor', 'None'# "self" is always first argument of any non-static method
@@ -704,7 +706,7 @@ def restore_clr(p_name, p_class, update_imports_for=None):
     for m in methods:
         parameter_lists.append([p.Name for p in m.GetParameters()])
         parameter_types.append([resolve_generic_type_params(t.ParameterType, update_imports_for=update_imports_for) for t in m.GetParameters()])
-        return_type = m.ReturnType if m.Name != '.ctor' else None
+        return_type = m.ReturnType if m.Name != '.ctor' else clr_type
         method_returns.append([resolve_generic_type_params(return_type, update_imports_for=update_imports_for)])
 
     for (params, method_return) in restore_parameters_for_overloads(parameter_lists, parameter_types, method_returns):
@@ -758,7 +760,8 @@ def resolve_generic_type_params(clr_type, update_imports_for=None):
 
     if clr_type.IsGenericType and type_arg_count == 0:
         clr_type = clr_type.GetGenericTypeDefinition()
-        generic_args = clr_type.GetGenericTypeArguments()
+        if hasattr(clr_type, 'GetGenericTypeArguments'):
+            generic_args = clr_type.GetGenericTypeArguments()
 
     generic_types = ''
     namespace = clr_type.Namespace

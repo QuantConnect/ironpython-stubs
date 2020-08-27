@@ -518,9 +518,9 @@ class ModuleRedeclarator(object):
                 deco = "classmethod"
             elif type(p_func).__name__.startswith('staticmethod'):
                 deco = "staticmethod"
-        if p_name == "__new__":
-            deco = "staticmethod"
-            deco_comment = " # known case of __new__"
+        #if p_name == "__new__":
+        #    deco = "staticmethod"
+        #    deco_comment = " # known case of __new__"
 
         action("redoing innards of func %r of class %r", p_name, p_class)
         if deco and HAS_DECORATORS:
@@ -561,6 +561,7 @@ class ModuleRedeclarator(object):
 
             if overloaded:
                 # Use the last method return to set the overloaded method
+                p_name = '__init__' if p_name == '__new__' else p_name
                 out(indent, "def " + p_name + "(self, *args) -> " + method_return + ":")
                 out(indent + 1, "pass")
                 out(0, "")

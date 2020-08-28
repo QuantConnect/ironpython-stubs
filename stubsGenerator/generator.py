@@ -54,6 +54,26 @@ def generate(rootdir, keep_partial=True, partition=True, size_limit=1048576):
                 for partial in partial_files:
                     os.remove(partial)
 
+    moved_files = []
+    for subdir, dirs, files in os.walk(rootdir):
+        for file in files:
+            relative_path = os.path.join(subdir, file)
+            if len([i for i in files if os.path.join(subdir, i).upper() == relative_path.upper()]) > 1 and not file.startswith('__') and relative_path.upper() not in moved_files:
+                # Let's pick the first element and move it into its own folder, as long as it's not a partitioned file
+                # or the root of a namespace
+                try:
+                    # Strips .py extension with [:-3]
+                    new_directory = os.path.join(subdir, file[:-3])
+                    new_partial_path = os.path.join(new_directory, '__init__.py')
+
+                    os.mkdir(new_directory)
+                    os.rename(relative_path, new_partial_path)
+                    moved_files.append(relative_path.upper())
+                    print(f'Moved {relative_path} to {new_partial_path}')
+                except Exception as e:
+                    print(str(e))
+                    print(f'Failed to move duplicate file to path: {os.path.join(subdir, file)}')
+
 def partition_file(tree_original: Module, filename, file_extension, file_path, size_limit, has_partial):
     file_size = 0
     partition = pasta.parse("")
